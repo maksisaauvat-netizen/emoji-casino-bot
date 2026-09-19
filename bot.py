@@ -2259,68 +2259,11 @@ async def text_message_handler(
 # ADMIN BALANCE ACTIONS
 # =========================================================
 
-async def admin_change_target_balance(
-    callback: CallbackQuery,
+def admin_target_view(
+    target_id: int,
+    new_balance: int,
     amount: int
 ):
-
-    if not is_admin(
-        callback.from_user.id
-    ):
-
-        await callback.answer(
-            "⛔ Доступ запрещён.",
-            show_alert=True
-        )
-        return
-
-    state = games.get(
-        callback.from_user.id
-    )
-
-    if not state:
-        await callback.answer(
-            "Пользователь не выбран.",
-            show_alert=True
-        )
-        return
-
-    target_id = state.get(
-        "target_id"
-    )
-
-    if not target_id:
-        await callback.answer(
-            "Пользователь не выбран.",
-            show_alert=True
-        )
-        return
-
-    new_balance = change_balance(
-        target_id,
-        amount
-    )
-
-    await callback.answer(
-        "Баланс изменён."
-    )
-
-    await callback.message.edit_text(
-        "👥 <b>ПОЛЬЗОВАТЕЛЬ</b>\n\n"
-        "━━━━━━━━━━━━━━━━━━\n\n"
-        f"🆔 ID: <code>{target_id}</code>\n"
-        f"💰 Новый баланс: <b>{money(new_balance)} ₽</b>\n\n"
-        (
-            f"🟢 Добавлено: +{money(amount)} ₽"
-            if amount > 0
-            else f"🔴 Списано: {money(abs(amount))} ₽"
-        ),
-        reply_markup=admin_target_keyboard()
-    )
-
-
-def admin_target_keyboard():
-
     builder = InlineKeyboardBuilder()
 
     builder.button(
@@ -2360,7 +2303,128 @@ def admin_target_keyboard():
 
     builder.adjust(3, 3, 1)
 
-    return builder.as_markup()
+    if amount > 0:
+        action_text = (
+            f"🟢 Добавлено: <b>+{money(amount)} ₽</b>"
+        )
+    else:
+        action_text = (
+            f"🔴 Списано: <b>{money(abs(amount))} ₽</b>"
+        )
+
+    return (
+        "👥 <b>ПОЛЬЗОВАТЕЛЬ</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        f"🆔 ID: <code>{target_id}</code>\n"
+        f"💰 Новый баланс: <b>{money(new_balance)} ₽</b>\n\n"
+        f"{action_text}",
+        builder.as_markup()
+    )
+
+
+async def admin_change_target_balance(
+    callback: CallbackQuery,
+    amount: int
+):
+
+    if not is_admin(callback.from_user.id):
+
+        await callback.answer(
+            "⛔ Доступ запрещён.",
+            show_alert=True
+        )
+        return
+
+    state = games.get(callback.from_user.id)
+
+    if not state or state.get("type") != "admin_target":
+
+        await callback.answer(
+            "Пользователь не выбран.",
+            show_alert=True
+        )
+        return
+
+    target_id = state.get("target_id")
+
+    if not target_id:
+
+        await callback.answer(
+            "Пользователь не выбран.",
+            show_alert=True
+        )
+        return
+
+    # -----------------------------------------------------
+    # ЗАЩИТА ОТ ПОВТОРНОГО НАЖАТИЯ
+    # -----------------------------------------------------
+
+    callback_key = (
+        f"admin_action_{callback.id}"
+    )
+
+    if callback_key in games:
+        await callback.answer(
+            "Это действие уже выполнено.",
+            show_alert=True
+        )
+        return
+
+    games[callback_key] = True
+
+    # -----------------------------------------------------
+    # ДОБАВЛЕНИЕ
+    # -----------------------------------------------------
+
+    if amount > 0:
+
+        new_balance = change_balance(
+            target_id,
+            amount
+        )
+
+    # -----------------------------------------------------
+    # СНЯТИЕ
+    # -----------------------------------------------------
+
+    else:
+
+        success = subtract_balance(
+            target_id,
+            abs(amount)
+        )
+
+        if not success:
+
+            games.pop(
+                callback_key,
+                None
+            )
+
+            await callback.answer(
+                "❌ Недостаточно средств у пользователя.",
+                show_alert=True
+            )
+            return
+
+        new_balance = get_balance(
+            target_id
+        )
+
+    await callback.answer(
+        "Баланс изменён."
+    )
+
+    text, keyboard = admin_target_view(
+        target_id,
+        new_balance,
+        amount
+    )
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=keyboard
+    )
 
 
 @dp.callback_query(F.data == "admin_add_100")
@@ -2426,10 +2490,7 @@ async def admin_sub_1000(
     await admin_change_target_balance(
         callback,
         -1000
-    )
-
-
-# =========================================================
+    )# =========================================================
 # ADMIN STATISTICS
 # =========================================================
 
