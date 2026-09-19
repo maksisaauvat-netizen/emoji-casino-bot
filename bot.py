@@ -36,7 +36,7 @@ async def message_handler(message):
 @app.on_event("startup")
 async def startup():
     webhook_url = f"{RENDER_URL}/webhook/{WEBHOOK_SECRET}"
-    await bot.set_webhook(webhook_url)
+    await bot.set_webhook(webhook_url, secret_token=WEBHOOK_SECRET)
 
 
 @app.on_event("shutdown")
