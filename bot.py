@@ -5,7 +5,9 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message
 
 
-TOKEN = "ТВОЙ_ТОКЕН_ОТ_BOTFATHER"
+import os
+
+TOKEN = os.getenv("BOT_TOKEN")
 
 dp = Dispatcher()
 
