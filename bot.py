@@ -1053,7 +1053,9 @@ async def bowling_handler(callback: CallbackQuery):
         "bowling_less"
     })
 )
-async def bowling_bet_handler(callback: CallbackQuery):
+async def bowling_bet_handler(
+    callback: CallbackQuery
+):
     user_id = callback.from_user.id
 
     if user_id in games:
@@ -1112,33 +1114,34 @@ async def bowling_bet_handler(callback: CallbackQuery):
 
 
 # =========================================================
-# MINES — PREMIUM
+# MINES
 # =========================================================
 
 def mines_keyboard(
     opened,
     mines=None,
+    hit_mine=None,
     finished=False
 ):
     builder = InlineKeyboardBuilder()
 
     for position in range(9):
 
+        # Уже открытая безопасная клетка
         if position in opened:
             text = "💎"
 
+        # Клетка, на которой игрок подорвался
         elif (
             finished
-            and mines is not None
-            and position in mines
+            and hit_mine is not None
+            and position == hit_mine
         ):
             text = "💣"
 
-        elif finished:
-            text = "▫️"
-
+        # Все остальные клетки всегда пустые
         else:
-            text = "❓"
+            text = "▫️"
 
         builder.button(
             text=text,
@@ -1153,24 +1156,22 @@ def mines_keyboard(
             callback_data="mines_cashout"
         )
 
-    builder.button(
-        text="📂  НАЗАД",
-        callback_data="mini_games"
-    )
+        builder.button(
+            text="📂  НАЗАД",
+            callback_data="mini_games"
+        )
 
-    if not finished:
         builder.adjust(3, 1, 1)
+
     else:
+        builder.button(
+            text="📂  НАЗАД",
+            callback_data="mini_games"
+        )
+
         builder.adjust(3, 1)
 
     return builder.as_markup()
-
-
-def mines_multiplier_text(opened_count):
-    if opened_count == 0:
-        return "x1.00"
-
-    return f"x{MINES_MULTIPLIERS[opened_count]:.2f}"
 
 
 @dp.callback_query(F.data == "mines")
@@ -1215,13 +1216,16 @@ async def mines_handler(callback: CallbackQuery):
         f"💳 Баланс: <b>{balance} ₽</b>\n\n"
         f"━━━━━━━━━━━━━━━━━━\n\n"
         f"🎯 <b>ОТКРЫВАЙ КЛЕТКИ</b>\n\n"
+        f"▫️ Закрытая клетка\n"
         f"💎 Безопасная клетка\n"
         f"💣 Мина\n\n"
         f"📦 Открыто: <b>0 / 6</b>\n"
         f"📈 Множитель: <b>x1.00</b>\n\n"
         f"━━━━━━━━━━━━━━━━━━\n\n"
-        f"💰 Выигрыш можно забрать после первого безопасного хода.",
-        reply_markup=mines_keyboard(set())
+        f"💰 Открой безопасную клетку, чтобы начать.",
+        reply_markup=mines_keyboard(
+            set()
+        )
     )
 
     await callback.answer()
@@ -1262,10 +1266,13 @@ async def mine_cell_handler(
         )
         return
 
+    # =====================================================
+    # 💣 МИНА
+    # =====================================================
+
     if position in game["mines"]:
 
         opened = game["opened"].copy()
-        mines = game["mines"].copy()
 
         del games[user_id]
 
@@ -1275,15 +1282,15 @@ async def mine_cell_handler(
             f"💣 <b>МИНЫ</b>\n\n"
             f"━━━━━━━━━━━━━━━━━━\n\n"
             f"💥 <b>МИНА!</b>\n\n"
-            f"Ты открыл опасную клетку.\n"
-            f"💸 Потеряно: <b>{STAKE} ₽</b>\n\n"
+            f"Эта клетка оказалась заминирована.\n\n"
+            f"💸 Потеряно: <b>{STAKE} ₽</b>\n"
             f"📦 Безопасных клеток: <b>{len(opened)} / 6</b>\n"
             f"💳 Баланс: <b>{balance} ₽</b>\n\n"
             f"━━━━━━━━━━━━━━━━━━\n\n"
-            f"💣 Поле раскрыто",
+            f"💣 <b>ИГРА ОКОНЧЕНА</b>",
             reply_markup=mines_keyboard(
-                opened,
-                mines,
+                opened=opened,
+                hit_mine=position,
                 finished=True
             )
         )
@@ -1294,11 +1301,19 @@ async def mine_cell_handler(
 
         return
 
+    # =====================================================
+    # 💎 БЕЗОПАСНАЯ КЛЕТКА
+    # =====================================================
+
     game["opened"].add(position)
 
     opened_count = len(
         game["opened"]
     )
+
+    # =====================================================
+    # 🏆 ВСЕ 6 БЕЗОПАСНЫХ
+    # =====================================================
 
     if opened_count >= 6:
 
@@ -1313,35 +1328,39 @@ async def mine_cell_handler(
             payout
         )
 
-        balance = get_balance(user_id)
+        balance = get_balance(
+            user_id
+        )
 
         opened = game["opened"].copy()
-        mines = game["mines"].copy()
 
         del games[user_id]
 
         await callback.message.edit_text(
             f"💣 <b>МИНЫ</b>\n\n"
             f"━━━━━━━━━━━━━━━━━━\n\n"
-            f"🏆 <b>ИДЕАЛЬНАЯ ИГРА!</b>\n\n"
-            f"💎 Все безопасные клетки открыты\n\n"
-            f"📦 Открыто: <b>6 / 6</b>\n"
+            f"🏆 <b>ВСЕ КЛЕТКИ ОТКРЫТЫ!</b>\n\n"
+            f"💎 Безопасных: <b>6 / 6</b>\n"
             f"📈 Множитель: <b>x{multiplier:.2f}</b>\n"
             f"💰 Выигрыш: <b>+{payout} ₽</b>\n\n"
             f"💳 Баланс: <b>{balance} ₽</b>\n\n"
-            f"━━━━━━━━━━━━━━━━━━",
+            f"━━━━━━━━━━━━━━━━━━\n\n"
+            f"💎 <b>ИДЕАЛЬНЫЙ РАУНД</b>",
             reply_markup=mines_keyboard(
-                opened,
-                mines,
+                opened=opened,
                 finished=True
             )
         )
 
         await callback.answer(
-            "🏆 Максимальный выигрыш!"
+            "🏆 Победа!"
         )
 
         return
+
+    # =====================================================
+    # 💎 ПРОДОЛЖЕНИЕ ИГРЫ
+    # =====================================================
 
     multiplier = MINES_MULTIPLIERS[
         opened_count
@@ -1354,12 +1373,13 @@ async def mine_cell_handler(
     await callback.message.edit_text(
         f"💣 <b>МИНЫ</b>\n\n"
         f"━━━━━━━━━━━━━━━━━━\n\n"
-        f"💎 <b>БЕЗОПАСНО</b>\n\n"
+        f"💎 <b>БЕЗОПАСНО!</b>\n\n"
         f"📦 Открыто: <b>{opened_count} / 6</b>\n"
         f"📈 Множитель: <b>x{multiplier:.2f}</b>\n"
-        f"💰 Сейчас можно забрать: <b>{potential_win} ₽</b>\n\n"
+        f"💰 Можно забрать: <b>{potential_win} ₽</b>\n\n"
         f"━━━━━━━━━━━━━━━━━━\n\n"
-        f"🎯 Риск продолжается...",
+        f"🎯 Выбери следующую клетку\n"
+        f"или забери выигрыш.",
         reply_markup=mines_keyboard(
             game["opened"]
         )
@@ -1369,6 +1389,10 @@ async def mine_cell_handler(
         "💎 Безопасно!"
     )
 
+
+# =========================================================
+# MINES CASHOUT
+# =========================================================
 
 @dp.callback_query(F.data == "mines_cashout")
 async def mines_cashout_handler(
@@ -1416,23 +1440,23 @@ async def mines_cashout_handler(
         payout
     )
 
-    balance = get_balance(user_id)
+    balance = get_balance(
+        user_id
+    )
 
     opened = game["opened"].copy()
-    mines = game["mines"].copy()
 
     del games[user_id]
 
     await callback.message.edit_text(
         f"💣 <b>МИНЫ</b>\n\n"
         f"━━━━━━━━━━━━━━━━━━\n\n"
-        f"💰 <b>ВЫИГРЫШ ЗАБРАН</b>\n\n"
-        f"💎 Безопасных клеток: <b>{opened_count} / 6</b>\n"
+        f"💰 <b>ВЫИГРЫШ ЗАБРАН!</b>\n\n"
+        f"💎 Открыто: <b>{opened_count} / 6</b>\n"
         f"📈 Множитель: <b>x{multiplier:.2f}</b>\n"
         f"💰 Получено: <b>+{payout} ₽</b>\n\n"
         f"💳 Баланс: <b>{balance} ₽</b>\n\n"
-        f"━━━━━━━━━━━━━━━━━━\n\n"
-        f"🧠 Хороший момент остановиться.",
+        f"━━━━━━━━━━━━━━━━━━",
         reply_markup=after_game_menu()
     )
 
@@ -1564,7 +1588,9 @@ async def crash_loop(
 
             del games[user_id]
 
-            balance = get_balance(user_id)
+            balance = get_balance(
+                user_id
+            )
 
             try:
                 await message.edit_text(
@@ -1582,8 +1608,10 @@ async def crash_loop(
 
         if multiplier < 2:
             multiplier += 0.05
+
         elif multiplier < 5:
             multiplier += 0.08
+
         else:
             multiplier += 0.12
 
@@ -1596,18 +1624,22 @@ async def crash_loop(
 
         if multiplier < 2:
             indicator = "🟢"
+
         elif multiplier < 5:
             indicator = "🟡"
+
         else:
             indicator = "🔴"
 
         try:
+
             await message.edit_text(
                 f"🧨 <b>CRASH</b>\n\n"
                 f"{indicator} <b>{multiplier:.2f}x</b>\n\n"
                 f"💰 Забрать: <b>{int(STAKE * multiplier)} ₽</b>",
                 reply_markup=crash_menu()
             )
+
         except Exception:
             pass
 
@@ -1647,7 +1679,9 @@ async def crash_cashout_handler(
         payout
     )
 
-    balance = get_balance(user_id)
+    balance = get_balance(
+        user_id
+    )
 
     del games[user_id]
 
@@ -1691,7 +1725,9 @@ async def crash_cancel_handler(
 
     del games[user_id]
 
-    balance = get_balance(user_id)
+    balance = get_balance(
+        user_id
+    )
 
     await callback.message.edit_text(
         f"🧨 <b>CRASH</b>\n\n"
@@ -1792,6 +1828,7 @@ async def dice_result_handler(
                 )
 
             del games[user_id]
+
             return
 
         if game["type"] == "dice_two":
@@ -1887,6 +1924,7 @@ async def dice_result_handler(
                 )
 
             del games[user_id]
+
             return
 
     # =====================================================
@@ -1947,6 +1985,7 @@ async def dice_result_handler(
             )
 
         del games[user_id]
+
         return
 
     # =====================================================
@@ -2034,6 +2073,7 @@ async def dice_result_handler(
             )
 
         del games[user_id]
+
         return
 
 
