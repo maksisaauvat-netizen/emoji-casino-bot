@@ -172,10 +172,12 @@ async def webhook(
 
     data = await request.json()
 
-    update = Update.model_validate(
-        data,
-        context={"bot": bot}
-    )
+print("UPDATE RECEIVED:", data)
+
+update = Update.model_validate(
+    data,
+    context={"bot": bot}
+)
 
     await dp.feed_update(bot, update)
 
