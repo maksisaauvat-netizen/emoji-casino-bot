@@ -1,4 +1,5 @@
 import os
+import random
 
 from fastapi import FastAPI, Request, Header, HTTPException
 from aiogram import Bot, Dispatcher
@@ -34,14 +35,12 @@ bot = Bot(TOKEN)
 dp = Dispatcher()
 app = FastAPI()
 
-
 # Активные игры пользователей.
-# Деньги хранятся в SQLite.
 games = {}
 
 
 # =========================
-# КЛАВИАТУРЫ
+# МЕНЮ ИГР
 # =========================
 
 def games_menu():
@@ -52,10 +51,20 @@ def games_menu():
                     text="🎲 | Кубики",
                     callback_data="game_dice",
                 )
-            ]
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🎡 | Рулетка",
+                    callback_data="game_roulette",
+                )
+            ],
         ]
     )
 
+
+# =========================
+# КУБИКИ
+# =========================
 
 def dice_modes():
     return InlineKeyboardMarkup(
@@ -131,6 +140,12 @@ def after_game_keyboard():
             ],
             [
                 InlineKeyboardButton(
+                    text="🎡 | Рулетка",
+                    callback_data="game_roulette",
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     text="⬅️ | К играм",
                     callback_data="games_menu",
                 )
@@ -140,13 +155,117 @@ def after_game_keyboard():
 
 
 # =========================
-# НАЧАЛО ИГРЫ В КУБИКИ
+# РУЛЕТКА
 # =========================
 
-async def start_dice_game(callback):
+def roulette_bets():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🔴 Красное x2",
+                    callback_data="roulette_red",
+                ),
+                InlineKeyboardButton(
+                    text="⚫ Чёрное x2",
+                    callback_data="roulette_black",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⬆️ 1–18 x2",
+                    callback_data="roulette_low",
+                ),
+                InlineKeyboardButton(
+                    text="⬇️ 19–36 x2",
+                    callback_data="roulette_high",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⚪ Чётное x2",
+                    callback_data="roulette_even",
+                ),
+                InlineKeyboardButton(
+                    text="🟣 Нечётное x2",
+                    callback_data="roulette_odd",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🟢 Зеро x36",
+                    callback_data="roulette_zero",
+                )
+            ],
+        ]
+    )
+
+
+def roulette_again_keyboard():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🎡 | Крутить ещё раз",
+                    callback_data="game_roulette",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🎲 | Кубики",
+                    callback_data="game_dice",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="⬅️ | К играм",
+                    callback_data="games_menu",
+                )
+            ],
+        ]
+    )
+
+
+# Европейская рулетка.
+RED_NUMBERS = {
+    1, 3, 5, 7, 9,
+    12, 14, 16, 18,
+    19, 21, 23, 25, 27,
+    30, 32, 34, 36,
+}
+
+
+def roulette_color(number):
+    if number == 0:
+        return "🟢"
+
+    if number in RED_NUMBERS:
+        return "🔴"
+
+    return "⚫"
+
+
+def roulette_bet_name(bet):
+    names = {
+        "red": "🔴 Красное",
+        "black": "⚫ Чёрное",
+        "low": "⬆️ 1–18",
+        "high": "⬇️ 19–36",
+        "even": "⚪ Чётное",
+        "odd": "🟣 Нечётное",
+        "zero": "🟢 Зеро",
+    }
+
+    return names.get(bet, "Неизвестная ставка")
+
+
+# =========================
+# НАЧАЛО РУЛЕТКИ
+# =========================
+
+async def start_roulette(callback):
     user_id = callback.from_user.id
 
-    # Не разрешаем создать второй раунд.
     if user_id in games:
         await callback.answer(
             "🎲 У тебя уже есть активная игра.",
@@ -163,7 +282,43 @@ async def start_dice_game(callback):
         )
         return
 
-    # Списываем ставку.
+    # Ставка списывается только после выбора ставки,
+    # поэтому здесь пока ничего не списываем.
+
+    await callback.answer()
+
+    await callback.message.answer(
+        f"🎡 Рулетка\n\n"
+        f"Ставка: 100 💎\n"
+        f"💎 Баланс: {balance} 💎\n\n"
+        f"Выбери ставку:",
+        reply_markup=roulette_bets(),
+    )
+
+
+# =========================
+# НАЧАЛО ИГРЫ В КУБИКИ
+# =========================
+
+async def start_dice_game(callback):
+    user_id = callback.from_user.id
+
+    if user_id in games:
+        await callback.answer(
+            "🎲 У тебя уже есть активная игра.",
+            show_alert=True,
+        )
+        return
+
+    balance = get_balance(user_id)
+
+    if balance < 100:
+        await callback.answer(
+            "❌ Недостаточно монет.",
+            show_alert=True,
+        )
+        return
+
     success = subtract_balance(user_id, 100)
 
     if not success:
@@ -173,8 +328,8 @@ async def start_dice_game(callback):
         )
         return
 
-    # Создаём активную игру.
     games[user_id] = {
+        "type": "dice",
         "stake": 100,
         "mode": None,
         "prediction": None,
@@ -202,10 +357,7 @@ async def start_dice_game(callback):
 async def message_handler(message):
     user_id = message.from_user.id
 
-    # -------------------------
     # /start
-    # -------------------------
-
     if message.text == "/start":
         balance = get_balance(user_id)
 
@@ -228,19 +380,14 @@ async def message_handler(message):
         )
         return
 
-    # -------------------------
+    # =========================
     # НАСТОЯЩИЙ TELEGRAM DICE
-    # -------------------------
-    #
-    # Telegram присылает кубик
-    # не в message.text,
-    # а в message.dice.
-    #
+    # =========================
 
     if message.dice is not None:
+
         dice = message.dice
 
-        # Нас интересует именно 🎲.
         if dice.emoji != "🎲":
             return
 
@@ -249,7 +396,7 @@ async def message_handler(message):
         if not game:
             return
 
-        if game["completed"]:
+        if game.get("type") != "dice":
             return
 
         if game["mode"] is None:
@@ -258,18 +405,18 @@ async def message_handler(message):
         if game["prediction"] is None:
             return
 
-        # Значение настоящего Telegram Dice.
         result = dice.value
-
-        # Сразу закрываем раунд.
-        # Это предотвращает повторную выплату.
-        game["completed"] = True
 
         # =========================
         # 1 КУБИК
         # =========================
 
         if game["mode"] == 1:
+
+            if game["completed"]:
+                return
+
+            game["completed"] = True
 
             prediction = game["prediction"]
 
@@ -279,11 +426,7 @@ async def message_handler(message):
                 win = result > 3
 
             coefficient = 1.85
-
-            if win:
-                payout = 185
-            else:
-                payout = 0
+            payout = 185 if win else 0
 
             if payout > 0:
                 balance = change_balance(
@@ -309,36 +452,23 @@ async def message_handler(message):
         # =========================
         # 2 КУБИКА
         # =========================
-        #
-        # Первый настоящий Telegram Dice
-        # уже пришёл.
-        #
-        # Для режима 2 бросков сохраняем
-        # первый результат и ждём второй.
-        #
 
         if game["mode"] == 2:
 
-            # Если это первый кубик.
             if "first_dice" not in game:
 
                 game["first_dice"] = result
 
-                # Первый бросок не завершает игру.
-                game["completed"] = False
-
                 await message.answer(
                     f"🎲 Первый кубик: {result}\n\n"
-                    f"Теперь отправь 🎲 ещё раз — "
+                    f"Отправь 🎲 ещё раз — "
                     f"это будет второй кубик."
                 )
 
                 return
 
-            # Второй кубик.
             first = game["first_dice"]
             second = result
-
             total = first + second
 
             prediction = game["prediction"]
@@ -355,13 +485,9 @@ async def message_handler(message):
                 win = total > 7
                 coefficient = 1.85
 
-            if win:
-                if coefficient == 5.00:
-                    payout = 500
-                else:
-                    payout = 185
-            else:
-                payout = 0
+            payout = 500 if win and coefficient == 5.00 else (
+                185 if win else 0
+            )
 
             if payout > 0:
                 balance = change_balance(
@@ -395,9 +521,9 @@ async def callback_handler(callback):
 
     user_id = callback.from_user.id
 
-    # -------------------------
+    # =========================
     # ИГРАТЬ
-    # -------------------------
+    # =========================
 
     if callback.data == "play":
 
@@ -414,23 +540,159 @@ async def callback_handler(callback):
 
         return
 
-    # -------------------------
+    # =========================
     # КУБИКИ
-    # -------------------------
+    # =========================
 
     if callback.data == "game_dice":
         await start_dice_game(callback)
         return
 
-    # -------------------------
+    # =========================
+    # РУЛЕТКА
+    # =========================
+
+    if callback.data == "game_roulette":
+        await start_roulette(callback)
+        return
+
+    # =========================
+    # СТАВКИ РУЛЕТКИ
+    # =========================
+
+    roulette_callbacks = {
+        "roulette_red": "red",
+        "roulette_black": "black",
+        "roulette_low": "low",
+        "roulette_high": "high",
+        "roulette_even": "even",
+        "roulette_odd": "odd",
+        "roulette_zero": "zero",
+    }
+
+    if callback.data in roulette_callbacks:
+
+        # Нельзя начать рулетку поверх другой игры.
+        if user_id in games:
+            await callback.answer(
+                "🎡 У тебя уже есть активная игра.",
+                show_alert=True,
+            )
+            return
+
+        bet = roulette_callbacks[callback.data]
+
+        balance = get_balance(user_id)
+
+        if balance < 100:
+            await callback.answer(
+                "❌ Недостаточно монет.",
+                show_alert=True,
+            )
+            return
+
+        # Списываем ставку.
+        success = subtract_balance(
+            user_id,
+            100,
+        )
+
+        if not success:
+            await callback.answer(
+                "❌ Недостаточно монет.",
+                show_alert=True,
+            )
+            return
+
+        # Сохраняем раунд.
+        games[user_id] = {
+            "type": "roulette",
+            "stake": 100,
+            "bet": bet,
+            "completed": False,
+        }
+
+        await callback.answer()
+
+        # Генерируем результат.
+        number = random.randint(0, 36)
+
+        color = roulette_color(number)
+
+        win = False
+
+        if bet == "red":
+            win = number in RED_NUMBERS
+
+        elif bet == "black":
+            win = number != 0 and number not in RED_NUMBERS
+
+        elif bet == "low":
+            win = 1 <= number <= 18
+
+        elif bet == "high":
+            win = 19 <= number <= 36
+
+        elif bet == "even":
+            win = number != 0 and number % 2 == 0
+
+        elif bet == "odd":
+            win = number != 0 and number % 2 == 1
+
+        elif bet == "zero":
+            win = number == 0
+
+        if bet == "zero":
+            coefficient = 36.0
+        else:
+            coefficient = 2.0
+
+        payout = (
+            int(100 * coefficient)
+            if win
+            else 0
+        )
+
+        if payout > 0:
+            balance = change_balance(
+                user_id,
+                payout,
+            )
+        else:
+            balance = get_balance(user_id)
+
+        games.pop(user_id, None)
+
+        result_text = (
+            "🎉 ПОБЕДА!"
+            if win
+            else "❌ Проигрыш"
+        )
+
+        await callback.message.answer(
+            f"🎡 РУЛЕТКА\n\n"
+            f"Выпало: {number} {color}\n\n"
+            f"Твоя ставка: "
+            f"{roulette_bet_name(bet)}\n"
+            f"Ставка: 100 💎\n"
+            f"Коэффициент: x{coefficient:.0f}\n\n"
+            f"{result_text}\n"
+            f"Выплата: {payout} 💎\n\n"
+            f"💎 Баланс: {balance} 💎",
+            reply_markup=roulette_again_keyboard(),
+        )
+
+        return
+
+    # =========================
     # 1 БРОСОК
-    # -------------------------
+    # =========================
 
     if callback.data == "dice_mode_1":
 
         game = games.get(user_id)
 
-        if not game:
+        if not game or game.get("type") != "dice":
             await callback.answer(
                 "❌ Игра не найдена.",
                 show_alert=True,
@@ -449,15 +711,15 @@ async def callback_handler(callback):
 
         return
 
-    # -------------------------
+    # =========================
     # 2 БРОСКА
-    # -------------------------
+    # =========================
 
     if callback.data == "dice_mode_2":
 
         game = games.get(user_id)
 
-        if not game:
+        if not game or game.get("type") != "dice":
             await callback.answer(
                 "❌ Игра не найдена.",
                 show_alert=True,
@@ -476,9 +738,9 @@ async def callback_handler(callback):
 
         return
 
-    # -------------------------
-    # ПРОГНОЗ
-    # -------------------------
+    # =========================
+    # ПРОГНОЗ КУБИКОВ
+    # =========================
 
     if callback.data in (
         "dice_one_less",
@@ -490,7 +752,7 @@ async def callback_handler(callback):
 
         game = games.get(user_id)
 
-        if not game:
+        if not game or game.get("type") != "dice":
             await callback.answer(
                 "❌ Игра не найдена.",
                 show_alert=True,
@@ -515,22 +777,16 @@ async def callback_handler(callback):
             else:
                 game["prediction"] = "more"
 
-        # Для двух кубиков
-        # очищаем первый результат,
-        # если он вдруг остался.
         game.pop("first_dice", None)
 
         await callback.answer()
 
         if game["mode"] == 1:
-
             await callback.message.answer(
                 "🎲 Отправь эмодзи 🎲, "
                 "чтобы бросить кубик."
             )
-
         else:
-
             await callback.message.answer(
                 "🎲 Отправь эмодзи 🎲, "
                 "чтобы бросить первый кубик."
@@ -538,17 +794,17 @@ async def callback_handler(callback):
 
         return
 
-    # -------------------------
+    # =========================
     # БРОСИТЬ ЕЩЁ РАЗ
-    # -------------------------
+    # =========================
 
     if callback.data == "dice_again":
         await start_dice_game(callback)
         return
 
-    # -------------------------
+    # =========================
     # К ИГРАМ
-    # -------------------------
+    # =========================
 
     if callback.data == "games_menu":
 
@@ -623,10 +879,7 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
 
-    # НЕ удаляем webhook.
-    # Иначе старый экземпляр Render
-    # может удалить webhook после запуска нового.
-
+    # Webhook НЕ удаляем.
     await bot.session.close()
 
 
