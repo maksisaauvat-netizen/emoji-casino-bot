@@ -157,7 +157,7 @@ def mini_games_menu():
         callback_data="menu"
     )
 
-    builder.adjust(1)
+    builder.adjust(2, 2, 2, 1)
 
     return builder.as_markup()
 
@@ -267,6 +267,21 @@ async def profile_handler(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "mini_games")
 async def mini_games_handler(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    balance = get_balance(user_id)
+
+    await callback.message.edit_text(
+        f"🎰 <b>МИНИ-ИГРЫ</b>\n\n"
+        f"💰 <b>БАЛАНС</b>\n"
+        f"<b>{balance}</b> ₽\n\n"
+        f"━━━━━━━━━━━━━━━━━━\n\n"
+        f"🎮 <b>ВЫБЕРИ ИГРУ</b>\n\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"⚡ 6 игр  •  Ставка от 100 ₽",
+        reply_markup=mini_games_menu()
+    )
+
+    await callback.answer()
     user_id = callback.from_user.id
     balance = get_balance(user_id)
 
