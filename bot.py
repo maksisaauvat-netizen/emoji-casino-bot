@@ -1,11 +1,51 @@
+import asyncio
 import os
 import random
-import asyncio
 
 from fastapi import FastAPI, Request
 from aiogram import Bot, Dispatcher, F, types
-from aiogram.filters import CommandStart
-from aiogram.client.default import DefaultBotProperties
+from aiogram.filters import Command
+
+
+# =========================
+# НАСТРОЙКИ
+# =========================
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+WEBHOOK_SECRET = os.getenv(
+    "WEBHOOK_SECRET",
+    "emoji_casino_secret_2026_x7k9"
+)
+
+WEBHOOK_PATH = f"/webhook/{WEBHOOK_SECRET}"
+WEBHOOK_URL = (
+    f"https://emoji-casino-bot.onrender.com"
+    f"{WEBHOOK_PATH}"
+)
+
+STAKE = 100
+
+# Слоты
+SLOT_TWO_MULTIPLIER = 1.85
+SLOT_OTHER_THREE_MULTIPLIER = 3.5
+SLOT_COCKTAIL_MULTIPLIER = 5
+SLOT_GRAPES_MULTIPLIER = 8
+SLOT_LEMON_MULTIPLIER = 10
+SLOT_SEVEN_MULTIPLIER = 50
+
+# Crash
+CRASH_MIN = 1.10
+CRASH_MAX = 20.00
+CRASH_SPEED = 0.50
+
+
+if not BOT_TOKEN:
+    raise RuntimeError("BOT_TOKEN is not set")
+
+
+# =========================
+# DATABASE
+# =========================
 
 from database import (
     init_db,
@@ -15,91 +55,22 @@ from database import (
 )
 
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
-
-if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN is not set")
-
-if not WEBHOOK_SECRET:
-    raise RuntimeError("WEBHOOK_SECRET is not set")
-
-
-STAKE = 100
-
 # =========================
-# DICE
+# BOT
 # =========================
 
-DICE_ONE_MULTIPLIER = 1.85
-DICE_TWO_EQUAL_MULTIPLIER = 5.0
-DICE_TWO_MULTIPLIER = 1.85
-
-# =========================
-# SLOTS
-# =========================
-
-SLOT_TWO_MULTIPLIER = 1.85
-SLOT_OTHER_THREE_MULTIPLIER = 3.5
-SLOT_COCKTAIL_MULTIPLIER = 5
-SLOT_GRAPES_MULTIPLIER = 8
-SLOT_LEMON_MULTIPLIER = 10
-SLOT_SEVEN_MULTIPLIER = 50
-
-# =========================
-# ROULETTE
-# =========================
-
-ROULETTE_MULTIPLIER = 1.95
-ROULETTE_ZERO_MULTIPLIER = 36
-
-RED_NUMBERS = {
-    1, 3, 5, 7, 9,
-    12, 14, 16, 18,
-    19, 21, 23, 25, 27,
-    30, 32, 34, 36
-}
-
-# =========================
-# MINES
-# =========================
-
-MINES_COUNT = 3
-
-MINES_MULTIPLIERS = {
-    1: 1.15,
-    2: 1.35,
-    3: 1.60,
-    4: 1.95,
-    5: 2.40,
-    6: 3.00,
-}
-
-# =========================
-# CRASH
-# =========================
-
-CRASH_MIN = 1.10
-CRASH_MAX = 20.00
-CRASH_SPEED = 0.50
-
-
-bot = Bot(
-    token=BOT_TOKEN,
-    default=DefaultBotProperties(parse_mode="HTML")
-)
-
+bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 app = FastAPI()
 
 games = {}
 
 
-# ============================================================
-# ГЛАВНЫЕ КЛАВИАТУРЫ
-# ============================================================
+# =========================
+# КЛАВИАТУРЫ
+# =========================
 
-def main_menu():
+def main_menu_keyboard():
     return types.InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -119,12 +90,12 @@ def main_menu():
                     text="🎰 | Мини-игры",
                     callback_data="mini_games"
                 )
-            ]
+            ],
         ]
     )
 
 
-def mini_games_menu():
+def mini_games_keyboard():
     return types.InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -155,7 +126,7 @@ def mini_games_menu():
                 types.InlineKeyboardButton(
                     text="💣 | Мины",
                     callback_data="game_mines"
-                ]
+                )
             ],
             [
                 types.InlineKeyboardButton(
@@ -168,12 +139,12 @@ def mini_games_menu():
                     text="📂 | Назад",
                     callback_data="main_menu"
                 )
-            ]
+            ],
         ]
     )
 
 
-def after_game_menu():
+def after_game_keyboard():
     return types.InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -187,17 +158,357 @@ def after_game_menu():
                     text="📂 | Меню",
                     callback_data="main_menu"
                 )
-            ]
+            ],
         ]
     )
 
 
-# ============================================================
-# START
-# ============================================================
+# =========================
+# ДИЗЫ / МЕНЮ
+# =========================
 
-@dp.message(CommandStart())
+def dice_keyboard():
+    return types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text="🎲 | Один бросок",
+                    callback_data="dice_one"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="🎲🎲 | Два броска",
+                    callback_data="dice_two"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="📂 | Назад",
+                    callback_data="mini_games"
+                )
+            ],
+        ]
+    )
+
+
+def dice_one_keyboard():
+    return types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text="x1.85 | Меньше 3",
+                    callback_data="dice_one_less"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="x1.85 | Больше 3",
+                    callback_data="dice_one_more"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="📂 | Назад",
+                    callback_data="game_dice"
+                )
+            ],
+        ]
+    )
+
+
+def dice_two_keyboard():
+    return types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text="x5.00 | Равно 7",
+                    callback_data="dice_two_equal"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="x1.85 | Меньше 7",
+                    callback_data="dice_two_less"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="x1.85 | Больше 7",
+                    callback_data="dice_two_more"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="📂 | Назад",
+                    callback_data="game_dice"
+                )
+            ],
+        ]
+    )
+
+
+def roulette_keyboard():
+    return types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text="🔴 Красное x1.95",
+                    callback_data="roulette_red"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="⚫ Чёрное x1.95",
+                    callback_data="roulette_black"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="1–18 x1.95",
+                    callback_data="roulette_low"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="19–36 x1.95",
+                    callback_data="roulette_high"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="⚖️ Чётное x1.95",
+                    callback_data="roulette_even"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="⚖️ Нечётное x1.95",
+                    callback_data="roulette_odd"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="🟢 Ноль x36",
+                    callback_data="roulette_zero"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="📂 | Назад",
+                    callback_data="mini_games"
+                )
+            ],
+        ]
+    )
+
+
+def bowling_keyboard():
+    return types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text="⬆️ | Больше 3 x1.85",
+                    callback_data="bowling_more"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="⬇️ | Меньше 3 x1.85",
+                    callback_data="bowling_less"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="📂 | Назад",
+                    callback_data="mini_games"
+                )
+            ],
+        ]
+    )
+
+
+# =========================
+# MINES
+# =========================
+
+MINES_MULTIPLIERS = {
+    1: 1.15,
+    2: 1.35,
+    3: 1.60,
+    4: 1.95,
+    5: 2.40,
+    6: 3.00,
+}
+
+
+def mines_keyboard(user_id):
+    game = games.get(user_id)
+
+    if not game:
+        return mini_games_keyboard()
+
+    mines = game["mines"]
+    opened = game["opened"]
+
+    buttons = []
+
+    for position in range(9):
+        if position in opened:
+            text = "💎"
+        else:
+            text = "⬜"
+
+        buttons.append(
+            types.InlineKeyboardButton(
+                text=text,
+                callback_data=f"mine_{position}"
+            )
+        )
+
+    rows = [
+        buttons[0:3],
+        buttons[3:6],
+        buttons[6:9],
+    ]
+
+    safe_count = len(opened)
+
+    if safe_count > 0:
+        multiplier = MINES_MULTIPLIERS[safe_count]
+
+        rows.append(
+            [
+                types.InlineKeyboardButton(
+                    text=f"💰 Забрать x{multiplier}",
+                    callback_data="mines_cashout"
+                )
+            ]
+        )
+
+    rows.append(
+        [
+            types.InlineKeyboardButton(
+                text="❌ | Отмена",
+                callback_data="mines_cancel"
+            )
+        ]
+    )
+
+    return types.InlineKeyboardMarkup(
+        inline_keyboard=rows
+    )
+
+
+# =========================
+# CRASH
+# =========================
+
+def generate_crash_point():
+    value = random.expovariate(1.0 / 2.5)
+
+    crash_point = 1.00 + value
+
+    crash_point = max(
+        CRASH_MIN,
+        crash_point
+    )
+
+    crash_point = min(
+        CRASH_MAX,
+        crash_point
+    )
+
+    return round(crash_point, 2)
+
+
+def crash_keyboard():
+    return types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text="💰 Забрать",
+                    callback_data="crash_cashout"
+                )
+            ],
+            [
+                types.InlineKeyboardButton(
+                    text="❌ Отмена",
+                    callback_data="crash_cancel"
+                )
+            ],
+        ]
+    )
+
+
+def crash_text(multiplier):
+    return (
+        "🧨 <b>CRASH</b>\n\n"
+        f"🚀 Коэффициент: <b>x{multiplier:.2f}</b>\n\n"
+        "💰 Забери выигрыш до краша!"
+    )
+
+
+# =========================
+# STARTUP
+# =========================
+
+@app.on_event("startup")
+async def on_startup():
+    init_db()
+
+    await bot.set_webhook(
+        WEBHOOK_URL,
+        allowed_updates=[
+            "message",
+            "callback_query",
+        ]
+    )
+
+    print("SETTING WEBHOOK:", WEBHOOK_URL)
+    print("WEBHOOK URL:", WEBHOOK_URL)
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    await bot.session.close()
+
+
+# =========================
+# WEBHOOK
+# =========================
+
+@app.post(WEBHOOK_PATH)
+async def telegram_webhook(request: Request):
+    data = await request.json()
+
+    update = types.Update.model_validate(data)
+
+    await dp.feed_update(
+        bot,
+        update
+    )
+
+    return {
+        "ok": True
+    }
+
+
+@app.get("/")
+async def root():
+    return {
+        "status": "ok",
+        "bot": "Emoji Casino"
+    }
+
+
+# =========================
+# START
+# =========================
+
+@dp.message(Command("start"))
 async def start_handler(message: types.Message):
+
     user_id = message.from_user.id
 
     balance = get_balance(user_id)
@@ -205,52 +516,53 @@ async def start_handler(message: types.Message):
     text = (
         "🎰 <b>Emoji Casino</b>\n\n"
         f"💰 Баланс: <b>{balance}</b>\n\n"
-        "Выберите раздел:"
+        "Добро пожаловать!"
     )
 
     await message.answer(
         text,
-        reply_markup=main_menu()
+        reply_markup=main_menu_keyboard()
     )
 
 
-# ============================================================
-# ГЛАВНОЕ МЕНЮ
-# ============================================================
+# =========================
+# MAIN MENU
+# =========================
 
 @dp.callback_query(F.data == "main_menu")
 async def main_menu_handler(callback: types.CallbackQuery):
+
     user_id = callback.from_user.id
 
     balance = get_balance(user_id)
 
     text = (
         "🎰 <b>Emoji Casino</b>\n\n"
-        f"💰 Баланс: <b>{balance}</b>\n\n"
-        "Выберите раздел:"
+        f"💰 Баланс: <b>{balance}</b>"
     )
 
     await callback.message.edit_text(
         text,
-        reply_markup=main_menu()
+        reply_markup=main_menu_keyboard()
     )
 
     await callback.answer()
 
 
-# ============================================================
-# ПРОФИЛЬ
-# ============================================================
+# =========================
+# PROFILE
+# =========================
 
 @dp.callback_query(F.data == "profile")
 async def profile_handler(callback: types.CallbackQuery):
+
     user = callback.from_user
     balance = get_balance(user.id)
 
     username = (
         f"@{user.username}"
         if user.username
-        else "Не указан"
+        else "не указан"
     )
 
     text = (
@@ -280,243 +592,68 @@ async def profile_handler(callback: types.CallbackQuery):
     await callback.answer()
 
 
-# ============================================================
-# МИНИ-ИГРЫ
-# ============================================================
+# =========================
+# MINI GAMES
+# =========================
 
 @dp.callback_query(F.data == "mini_games")
 async def mini_games_handler(callback: types.CallbackQuery):
+
     user_id = callback.from_user.id
+
     balance = get_balance(user_id)
 
     text = (
         "🎰 <b>Мини-игры</b>\n\n"
         f"💰 Баланс: <b>{balance}</b>\n\n"
-        "Выберите игру:"
+        "Выбери игру:"
     )
 
     await callback.message.edit_text(
         text,
-        reply_markup=mini_games_menu()
+        reply_markup=mini_games_keyboard()
     )
 
     await callback.answer()
 
 
-# ============================================================
-# 🎲 КУБИКИ
-# ============================================================
+# =========================
+# DICE MENU
+# =========================
 
 @dp.callback_query(F.data == "game_dice")
-async def dice_menu_handler(callback: types.CallbackQuery):
+async def game_dice_handler(callback: types.CallbackQuery):
+
     text = (
         "🎲 <b>Кубики</b>\n\n"
         f"💰 Ставка: <b>{STAKE}</b>\n\n"
-        "Выберите режим:"
-    )
-
-    keyboard = types.InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                types.InlineKeyboardButton(
-                    text="1 кубик",
-                    callback_data="dice_one"
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="2 кубика",
-                    callback_data="dice_two"
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="📂 | Назад",
-                    callback_data="mini_games"
-                )
-            ]
-        ]
+        "Выбери режим:"
     )
 
     await callback.message.edit_text(
         text,
-        reply_markup=keyboard
+        reply_markup=dice_keyboard()
     )
 
     await callback.answer()
 
 
-@dp.callback_query(F.data == "dice_one")
+# =========================
+# DICE ONE
+# =========================
+
+@dp.callback_query(F.data.in_({
+    "dice_one_less",
+    "dice_one_more"
+}))
 async def dice_one_handler(callback: types.CallbackQuery):
+
     user_id = callback.from_user.id
 
-    if not subtract_balance(user_id, STAKE):
-        await callback.answer(
-            "❌ Недостаточно средств",
-            show_alert=True
-        )
-        return
-
-    games[user_id] = {
-        "type": "dice_one"
-    }
-
-    keyboard = types.InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                types.InlineKeyboardButton(
-                    text="⬇️ | Меньше 3 x1.85",
-                    callback_data="dice_bet_less"
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="⬆️ | Больше 3 x1.85",
-                    callback_data="dice_bet_more"
-                )
-            ]
-        ]
-    )
-
-    await callback.message.edit_text(
-        "🎲 <b>Кубик — 1 бросок</b>\n\n"
-        "Выберите ставку:",
-        reply_markup=keyboard
-    )
-
-    await callback.answer()
-
-
-@dp.callback_query(F.data == "dice_bet_less")
-async def dice_bet_less_handler(callback: types.CallbackQuery):
-    user_id = callback.from_user.id
-
-    if user_id not in games:
-        await callback.answer(
-            "Игра не найдена",
-            show_alert=True
-        )
-        return
-
-    games[user_id]["bet"] = "less"
-
-    await callback.message.edit_text(
-        "🎲 <b>Меньше 3</b>\n\n"
-        "Сейчас будет брошен кубик 🎲"
-    )
-
-    await bot.send_dice(
-        callback.message.chat.id,
-        emoji="🎲"
-    )
-
-    await callback.answer()
-
-
-@dp.callback_query(F.data == "dice_bet_more")
-async def dice_bet_more_handler(callback: types.CallbackQuery):
-    user_id = callback.from_user.id
-
-    if user_id not in games:
-        await callback.answer(
-            "Игра не найдена",
-            show_alert=True
-        )
-        return
-
-    games[user_id]["bet"] = "more"
-
-    await callback.message.edit_text(
-        "🎲 <b>Больше 3</b>\n\n"
-        "Сейчас будет брошен кубик 🎲"
-    )
-
-    await bot.send_dice(
-        callback.message.chat.id,
-        emoji="🎲"
-    )
-
-    await callback.answer()
-
-
-@dp.callback_query(F.data == "dice_two")
-async def dice_two_handler(callback: types.CallbackQuery):
-    user_id = callback.from_user.id
-
-    if not subtract_balance(user_id, STAKE):
-        await callback.answer(
-            "❌ Недостаточно средств",
-            show_alert=True
-        )
-        return
-
-    games[user_id] = {
-        "type": "dice_two",
-        "first": None
-    }
-
-    await callback.message.edit_text(
-        "🎲 <b>Кубики — 2 броска</b>\n\n"
-        "Сейчас будут брошены два кубика.\n"
-        "Сначала первый 🎲"
-    )
-
-    await bot.send_dice(
-        callback.message.chat.id,
-        emoji="🎲"
-    )
-
-    await callback.answer()
-
-
-# ============================================================
-# 🎳 БОУЛИНГ
-# ============================================================
-
-@dp.callback_query(F.data == "game_bowling")
-async def bowling_menu_handler(callback: types.CallbackQuery):
-    text = (
-        "🎳 <b>Боулинг</b>\n\n"
-        f"💰 Ставка: <b>{STAKE}</b>\n\n"
-        "Выберите ставку:"
-    )
-
-    keyboard = types.InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                types.InlineKeyboardButton(
-                    text="⬆️ | Больше 3 x1.85",
-                    callback_data="bowling_more"
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="⬇️ | Меньше 3 x1.85",
-                    callback_data="bowling_less"
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="📂 | Назад",
-                    callback_data="mini_games"
-                )
-            ]
-        ]
-    )
-
-    await callback.message.edit_text(
-        text,
-        reply_markup=keyboard
-    )
-
-    await callback.answer()
-
-
-@dp.callback_query(F.data.in_({"bowling_more", "bowling_less"}))
-async def bowling_bet_handler(callback: types.CallbackQuery):
-    user_id = callback.from_user.id
-
-    if not subtract_balance(user_id, STAKE):
+    if not subtract_balance(
+        user_id,
+        STAKE
+    ):
         await callback.answer(
             "❌ Недостаточно средств",
             show_alert=True
@@ -524,234 +661,89 @@ async def bowling_bet_handler(callback: types.CallbackQuery):
         return
 
     bet = (
-        "more"
-        if callback.data == "bowling_more"
-        else "less"
+        "less"
+        if callback.data == "dice_one_less"
+        else "more"
     )
 
     games[user_id] = {
-        "type": "bowling",
-        "bet": bet
+        "type": "dice_one",
+        "bet": bet,
     }
 
     await callback.message.edit_text(
-        "🎳 <b>Боулинг</b>\n\n"
-        "Бросаем шар..."
+        "🎲 Бросаю кубик..."
     )
 
     await bot.send_dice(
-        callback.message.chat.id,
-        emoji="🎳"
+        chat_id=callback.message.chat.id,
+        emoji="🎲"
     )
 
     await callback.answer()
 
 
-# ============================================================
-# 🎡 РУЛЕТКА
-# ============================================================
+# =========================
+# DICE TWO
+# =========================
 
-@dp.callback_query(F.data == "game_roulette")
-async def roulette_menu_handler(callback: types.CallbackQuery):
-    text = (
-        "🎡 <b>Рулетка</b>\n\n"
-        f"💰 Ставка: <b>{STAKE}</b>\n\n"
-        "Выберите ставку:"
-    )
+@dp.callback_query(F.data.in_({
+    "dice_two_equal",
+    "dice_two_less",
+    "dice_two_more"
+}))
+async def dice_two_handler(callback: types.CallbackQuery):
 
-    keyboard = types.InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                types.InlineKeyboardButton(
-                    text="🔴 | Красное x1.95",
-                    callback_data="roulette_red"
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="⚫ | Чёрное x1.95",
-                    callback_data="roulette_black"
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="⬇️ | 1–18 x1.95",
-                    callback_data="roulette_low"
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="⬆️ | 19–36 x1.95",
-                    callback_data="roulette_high"
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="➗ | Чётное x1.95",
-                    callback_data="roulette_even"
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="🔢 | Нечётное x1.95",
-                    callback_data="roulette_odd"
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="🟢 | 0 x36",
-                    callback_data="roulette_zero"
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="📂 | Назад",
-                    callback_data="mini_games"
-                )
-            ]
-        ]
-    )
-
-    await callback.message.edit_text(
-        text,
-        reply_markup=keyboard
-    )
-
-    await callback.answer()
-
-
-@dp.callback_query(F.data.startswith("roulette_"))
-async def roulette_bet_handler(callback: types.CallbackQuery):
     user_id = callback.from_user.id
 
-    if not subtract_balance(user_id, STAKE):
+    if not subtract_balance(
+        user_id,
+        STAKE
+    ):
         await callback.answer(
             "❌ Недостаточно средств",
             show_alert=True
         )
         return
 
-    bet = callback.data.replace(
-        "roulette_",
-        ""
-    )
-
-    number = random.randint(0, 36)
-
-    win = False
-    multiplier = ROULETTE_MULTIPLIER
-
-    if bet == "zero":
-        win = number == 0
-        multiplier = ROULETTE_ZERO_MULTIPLIER
-
-    elif number != 0:
-        if bet == "red":
-            win = number in RED_NUMBERS
-
-        elif bet == "black":
-            win = number not in RED_NUMBERS
-
-        elif bet == "low":
-            win = 1 <= number <= 18
-
-        elif bet == "high":
-            win = 19 <= number <= 36
-
-        elif bet == "even":
-            win = number % 2 == 0
-
-        elif bet == "odd":
-            win = number % 2 == 1
-
-    if number == 0:
-        color = "🟢"
-    elif number in RED_NUMBERS:
-        color = "🔴"
+    if callback.data == "dice_two_equal":
+        bet = "equal"
+    elif callback.data == "dice_two_less":
+        bet = "less"
     else:
-        color = "⚫"
+        bet = "more"
 
-    if win:
-        payout = int(STAKE * multiplier)
-
-        balance = change_balance(
-            user_id,
-            payout
-        )
-
-        text = (
-            "🎡 <b>Рулетка</b>\n\n"
-            f"Выпало: {color} <b>{number}</b>\n\n"
-            "🎉 Победа!\n"
-            f"💰 Выигрыш: <b>{payout}</b>\n\n"
-            f"💳 Баланс: <b>{balance}</b>"
-        )
-
-    else:
-        balance = get_balance(user_id)
-
-        text = (
-            "🎡 <b>Рулетка</b>\n\n"
-            f"Выпало: {color} <b>{number}</b>\n\n"
-            "❌ Вы проиграли.\n\n"
-            f"💳 Баланс: <b>{balance}</b>"
-        )
+    games[user_id] = {
+        "type": "dice_two",
+        "bet": bet,
+        "first": None,
+    }
 
     await callback.message.edit_text(
-        text,
-        reply_markup=after_game_menu()
+        "🎲🎲 Первый бросок..."
+    )
+
+    await bot.send_dice(
+        chat_id=callback.message.chat.id,
+        emoji="🎲"
     )
 
     await callback.answer()
 
 
-# ============================================================
-# 🎰 СЛОТЫ
-# ============================================================
+# =========================
+# SLOTS
+# =========================
 
 @dp.callback_query(F.data == "game_slots")
-async def slots_menu_handler(callback: types.CallbackQuery):
-    text = (
-        "🎰 <b>Слоты</b>\n\n"
-        f"💰 Ставка: <b>{STAKE}</b>\n\n"
-        "🎯 2 одинаковых → x1.85\n"
-        "🍸🍸🍸 → x5\n"
-        "🍇🍇🍇 → x8\n"
-        "🍋🍋🍋 → x10\n"
-        "7️⃣7️⃣7️⃣ → x50\n"
-        "Другие 3 одинаковых → x3.5"
-    )
+async def game_slots_handler(callback: types.CallbackQuery):
 
-    keyboard = types.InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                types.InlineKeyboardButton(
-                    text="🎰 | Крутить",
-                    callback_data="slots_spin"
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="📂 | Назад",
-                    callback_data="mini_games"
-                )
-            ]
-        ]
-    )
-
-    await callback.message.edit_text(
-        text,
-        reply_markup=keyboard
-    )
-
-    await callback.answer()
-
-
-@dp.callback_query(F.data == "slots_spin")
-async def slots_spin_handler(callback: types.CallbackQuery):
     user_id = callback.from_user.id
 
-    if not subtract_balance(user_id, STAKE):
+    if not subtract_balance(
+        user_id,
+        STAKE
+    ):
         await callback.answer(
             "❌ Недостаточно средств",
             show_alert=True
@@ -764,11 +756,11 @@ async def slots_spin_handler(callback: types.CallbackQuery):
 
     await callback.message.edit_text(
         "🎰 <b>Слоты</b>\n\n"
-        "Крутим..."
+        "🎰 Крутим барабаны..."
     )
 
     await bot.send_dice(
-        callback.message.chat.id,
+        chat_id=callback.message.chat.id,
         emoji="🎰"
     )
 
@@ -776,6 +768,7 @@ async def slots_spin_handler(callback: types.CallbackQuery):
 
 
 def slot_result(value):
+
     if value == 64:
         return (
             ["7️⃣", "7️⃣", "7️⃣"],
@@ -802,6 +795,7 @@ def slot_result(value):
     ]
 
     if result[0] == result[1] == result[2]:
+
         if result[0] == "🍸":
             return result, SLOT_COCKTAIL_MULTIPLIER
 
@@ -826,124 +820,217 @@ def slot_result(value):
     return result, 0
 
 
-# ============================================================
-# 💣 МИНЫ
-# ============================================================
+# =========================
+# ROULETTE
+# =========================
 
-def mines_board(game, reveal=False):
-    buttons = []
+RED_NUMBERS = {
+    1, 3, 5, 7, 9,
+    12, 14, 16, 18,
+    19, 21, 23, 25, 27,
+    30, 32, 34, 36
+}
 
-    mines = game["mines"]
-    opened = game["opened"]
 
-    for row in range(3):
-        row_buttons = []
+@dp.callback_query(F.data.startswith("roulette_"))
+async def roulette_handler(callback: types.CallbackQuery):
 
-        for col in range(3):
-            index = row * 3 + col
+    user_id = callback.from_user.id
 
-            if reveal:
-                if index in mines:
-                    text = "💣"
-                else:
-                    text = "💎"
+    if not subtract_balance(
+        user_id,
+        STAKE
+    ):
+        await callback.answer(
+            "❌ Недостаточно средств",
+            show_alert=True
+        )
+        return
 
-                callback_data = "mines_noop"
+    bet = callback.data.replace(
+        "roulette_",
+        ""
+    )
 
-            elif index in opened:
-                text = "💎"
-                callback_data = "mines_noop"
+    number = random.randint(
+        0,
+        36
+    )
 
-            else:
-                text = "❔"
-                callback_data = f"mine_cell_{index}"
+    won = False
+    multiplier = 1.95
 
-            row_buttons.append(
-                types.InlineKeyboardButton(
-                    text=text,
-                    callback_data=callback_data
-                )
-            )
+    if bet == "zero":
+        won = number == 0
+        multiplier = 36
 
-        buttons.append(row_buttons)
+    elif bet == "red":
+        won = number in RED_NUMBERS
 
-    if not reveal:
-        buttons.append(
-            [
-                types.InlineKeyboardButton(
-                    text="💰 | Забрать выигрыш",
-                    callback_data="mines_cashout"
-                )
-            ]
+    elif bet == "black":
+        won = (
+            number != 0
+            and number not in RED_NUMBERS
         )
 
-    return types.InlineKeyboardMarkup(
-        inline_keyboard=buttons
-    )
+    elif bet == "low":
+        won = 1 <= number <= 18
 
+    elif bet == "high":
+        won = 19 <= number <= 36
 
-def mines_text(game):
-    opened_count = len(game["opened"])
+    elif bet == "even":
+        won = number != 0 and number % 2 == 0
 
-    multiplier = MINES_MULTIPLIERS.get(
-        opened_count,
-        1.0
-    )
+    elif bet == "odd":
+        won = number != 0 and number % 2 == 1
 
-    payout = int(STAKE * multiplier)
+    if won:
+        payout = int(
+            STAKE * multiplier
+        )
 
-    return (
-        "💣 <b>Мины</b>\n\n"
-        f"💰 Ставка: <b>{STAKE}</b>\n"
-        f"💎 Открыто: <b>{opened_count}</b>\n"
-        f"📈 Коэффициент: <b>x{multiplier:.2f}</b>\n"
-        f"💵 Можно забрать: <b>{payout}</b>\n\n"
-        "Выберите клетку:"
-    )
+        balance = change_balance(
+            user_id,
+            payout
+        )
 
+        result_text = (
+            f"🎉 <b>Победа!</b>\n\n"
+            f"🎡 Выпало: <b>{number}</b>\n"
+            f"💰 Выигрыш: <b>{payout}</b>\n"
+            f"💳 Баланс: <b>{balance}</b>"
+        )
 
-@dp.callback_query(F.data == "game_mines")
-async def mines_menu_handler(callback: types.CallbackQuery):
-    text = (
-        "💣 <b>Мины</b>\n\n"
-        f"💰 Ставка: <b>{STAKE}</b>\n\n"
-        "Поле 3×3.\n"
-        "На поле спрятано 3 мины 💣.\n\n"
-        "Открывайте безопасные клетки 💎 "
-        "и увеличивайте множитель.\n\n"
-        "Если попадёте на мину — ставка сгорает."
-    )
+    else:
+        balance = get_balance(
+            user_id
+        )
 
-    keyboard = types.InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                types.InlineKeyboardButton(
-                    text="💣 | Начать игру",
-                    callback_data="mines_start"
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="📂 | Назад",
-                    callback_data="mini_games"
-                )
-            ]
-        ]
-    )
+        result_text = (
+            f"🎡 Выпало: <b>{number}</b>\n\n"
+            "❌ <b>Проигрыш</b>\n"
+            f"💳 Баланс: <b>{balance}</b>"
+        )
 
     await callback.message.edit_text(
-        text,
-        reply_markup=keyboard
+        result_text,
+        reply_markup=after_game_keyboard()
     )
 
     await callback.answer()
 
 
-@dp.callback_query(F.data == "mines_start")
-async def mines_start_handler(callback: types.CallbackQuery):
+@dp.callback_query(F.data == "game_roulette")
+async def game_roulette_handler(
+    callback: types.CallbackQuery
+):
+
+    balance = get_balance(
+        callback.from_user.id
+    )
+
+    text = (
+        "🎡 <b>Рулетка</b>\n\n"
+        f"💰 Ставка: <b>{STAKE}</b>\n"
+        f"💳 Баланс: <b>{balance}</b>\n\n"
+        "Выбери ставку:"
+    )
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=roulette_keyboard()
+    )
+
+    await callback.answer()
+
+
+# =========================
+# BOWLING
+# =========================
+
+@dp.callback_query(F.data.in_({
+    "bowling_more",
+    "bowling_less"
+}))
+async def bowling_bet_handler(
+    callback: types.CallbackQuery
+):
+
     user_id = callback.from_user.id
 
-    if not subtract_balance(user_id, STAKE):
+    if not subtract_balance(
+        user_id,
+        STAKE
+    ):
+        await callback.answer(
+            "❌ Недостаточно средств",
+            show_alert=True
+        )
+        return
+
+    bet = (
+        "more"
+        if callback.data == "bowling_more"
+        else "less"
+    )
+
+    games[user_id] = {
+        "type": "bowling",
+        "bet": bet
+    }
+
+    await callback.message.edit_text(
+        "🎳 Бросаю шар..."
+    )
+
+    await bot.send_dice(
+        chat_id=callback.message.chat.id,
+        emoji="🎳"
+    )
+
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "game_bowling")
+async def game_bowling_handler(
+    callback: types.CallbackQuery
+):
+
+    balance = get_balance(
+        callback.from_user.id
+    )
+
+    text = (
+        "🎳 <b>Боулинг</b>\n\n"
+        f"💰 Ставка: <b>{STAKE}</b>\n"
+        f"💳 Баланс: <b>{balance}</b>\n\n"
+        "Выбери ставку:"
+    )
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=bowling_keyboard()
+    )
+
+    await callback.answer()
+
+
+# =========================
+# MINES START
+# =========================
+
+@dp.callback_query(F.data == "game_mines")
+async def game_mines_handler(
+    callback: types.CallbackQuery
+):
+
+    user_id = callback.from_user.id
+
+    if not subtract_balance(
+        user_id,
+        STAKE
+    ):
         await callback.answer(
             "❌ Недостаточно средств",
             show_alert=True
@@ -953,7 +1040,7 @@ async def mines_start_handler(callback: types.CallbackQuery):
     mine_positions = set(
         random.sample(
             range(9),
-            MINES_COUNT
+            3
         )
     )
 
@@ -963,69 +1050,113 @@ async def mines_start_handler(callback: types.CallbackQuery):
         "opened": set(),
     }
 
-    game = games[user_id]
-
     await callback.message.edit_text(
-        mines_text(game),
-        reply_markup=mines_board(game)
+        "💣 <b>Мины</b>\n\n"
+        "💰 Ставка: <b>100</b>\n"
+        "💎 Открывай клетки и забери выигрыш!",
+        reply_markup=mines_keyboard(user_id)
     )
 
     await callback.answer()
 
 
-@dp.callback_query(F.data.startswith("mine_cell_"))
-async def mine_cell_handler(callback: types.CallbackQuery):
+# =========================
+# MINES CELL
+# =========================
+
+@dp.callback_query(F.data.startswith("mine_"))
+async def mine_cell_handler(
+    callback: types.CallbackQuery
+):
+
     user_id = callback.from_user.id
 
     game = games.get(user_id)
 
     if not game or game.get("type") != "mines":
         await callback.answer(
-            "❌ Игра закончена",
+            "❌ Игра не найдена",
             show_alert=True
         )
         return
 
-    index = int(
-        callback.data.replace(
-            "mine_cell_",
-            ""
-        )
+    position = int(
+        callback.data.split("_")[1]
     )
 
-    if index in game["opened"]:
-        await callback.answer()
+    if position in game["opened"]:
+        await callback.answer(
+            "Эта клетка уже открыта"
+        )
         return
 
-    if index in game["mines"]:
-        game["opened"].add(index)
+    if position in game["mines"]:
 
-        await callback.message.edit_text(
-            "💣 <b>Мины</b>\n\n"
-            "💥 Вы попали на мину!\n\n"
-            "❌ Ставка сгорела.",
-            reply_markup=mines_board(
-                game,
-                reveal=True
+        game["opened"].add(position)
+
+        keyboard_rows = []
+
+        for i in range(9):
+            if i in game["mines"]:
+                text = "💣"
+            elif i in game["opened"]:
+                text = "💎"
+            else:
+                text = "⬜"
+
+            keyboard_rows.append(
+                types.InlineKeyboardButton(
+                    text=text,
+                    callback_data="mine_disabled"
+                )
             )
+
+        rows = [
+            keyboard_rows[0:3],
+            keyboard_rows[3:6],
+            keyboard_rows[6:9],
+        ]
+
+        rows.append(
+            [
+                types.InlineKeyboardButton(
+                    text="🔄 | Играть снова",
+                    callback_data="game_mines"
+                )
+            ]
+        )
+
+        rows.append(
+            [
+                types.InlineKeyboardButton(
+                    text="📂 | Меню",
+                    callback_data="mini_games"
+                )
+            ]
         )
 
         del games[user_id]
 
-        await callback.answer(
-            "💣 Мина!",
-            show_alert=True
+        await callback.message.edit_text(
+            "💣 <b>БАБАХ!</b>\n\n"
+            "❌ Ты попал на мину.\n"
+            "💰 Ставка проиграна.",
+            reply_markup=types.InlineKeyboardMarkup(
+                inline_keyboard=rows
+            )
         )
 
+        await callback.answer()
         return
 
-    game["opened"].add(index)
+    game["opened"].add(position)
 
-    opened_count = len(
+    safe_count = len(
         game["opened"]
     )
 
-    if opened_count == 6:
+    if safe_count >= 6:
+
         multiplier = MINES_MULTIPLIERS[6]
 
         payout = int(
@@ -1037,65 +1168,65 @@ async def mine_cell_handler(callback: types.CallbackQuery):
             payout
         )
 
+        del games[user_id]
+
         await callback.message.edit_text(
             "💣 <b>Мины</b>\n\n"
             "🎉 Все безопасные клетки открыты!\n\n"
-            f"💎 Открыто: <b>6</b>\n"
-            f"📈 Коэффициент: <b>x{multiplier:.2f}</b>\n"
-            f"💰 Выигрыш: <b>{payout}</b>\n\n"
+            f"💰 Выигрыш: <b>{payout}</b>\n"
             f"💳 Баланс: <b>{balance}</b>",
-            reply_markup=after_game_menu()
+            reply_markup=after_game_keyboard()
         )
 
-        del games[user_id]
-
-        await callback.answer(
-            "🎉 Максимальный выигрыш!",
-            show_alert=True
-        )
-
+        await callback.answer()
         return
 
     multiplier = MINES_MULTIPLIERS[
-        opened_count
+        safe_count
     ]
 
-    await callback.message.edit_text(
-        mines_text(game),
-        reply_markup=mines_board(game)
+    await callback.message.edit_reply_markup(
+        reply_markup=mines_keyboard(user_id)
     )
 
     await callback.answer(
-        f"💎 Безопасно! x{multiplier:.2f}"
+        f"💎 Безопасно! x{multiplier}"
     )
 
 
+# =========================
+# MINES CASHOUT
+# =========================
+
 @dp.callback_query(F.data == "mines_cashout")
-async def mines_cashout_handler(callback: types.CallbackQuery):
+async def mines_cashout_handler(
+    callback: types.CallbackQuery
+):
+
     user_id = callback.from_user.id
 
     game = games.get(user_id)
 
     if not game or game.get("type") != "mines":
         await callback.answer(
-            "❌ Игра закончена",
+            "❌ Игра не найдена",
             show_alert=True
         )
         return
 
-    opened_count = len(
+    safe_count = len(
         game["opened"]
     )
 
-    if opened_count == 0:
+    if safe_count == 0:
         await callback.answer(
-            "Сначала откройте хотя бы одну клетку 💎",
+            "Сначала открой хотя бы одну клетку",
             show_alert=True
         )
         return
 
     multiplier = MINES_MULTIPLIERS[
-        opened_count
+        safe_count
     ]
 
     payout = int(
@@ -1107,114 +1238,69 @@ async def mines_cashout_handler(callback: types.CallbackQuery):
         payout
     )
 
-    await callback.message.edit_text(
-        "💣 <b>Мины</b>\n\n"
-        "💰 Вы забрали выигрыш!\n\n"
-        f"💎 Открыто клеток: <b>{opened_count}</b>\n"
-        f"📈 Коэффициент: <b>x{multiplier:.2f}</b>\n"
-        f"💵 Выигрыш: <b>{payout}</b>\n\n"
-        f"💳 Баланс: <b>{balance}</b>",
-        reply_markup=after_game_menu()
-    )
-
     del games[user_id]
 
-    await callback.answer(
-        "💰 Выигрыш забран!"
+    await callback.message.edit_text(
+        "💣 <b>Мины</b>\n\n"
+        f"💎 Открыто клеток: <b>{safe_count}</b>\n"
+        f"📈 Коэффициент: <b>x{multiplier}</b>\n\n"
+        f"💰 Выигрыш: <b>{payout}</b>\n"
+        f"💳 Баланс: <b>{balance}</b>",
+        reply_markup=after_game_keyboard()
     )
 
-
-@dp.callback_query(F.data == "mines_noop")
-async def mines_noop_handler(callback: types.CallbackQuery):
     await callback.answer()
 
 
-# ============================================================
-# 🧨 CRASH
-# ============================================================
+# =========================
+# MINES CANCEL
+# =========================
 
-def generate_crash_point():
-    """
-    Генерируем точку, на которой игра закончится.
+@dp.callback_query(F.data == "mines_cancel")
+async def mines_cancel_handler(
+    callback: types.CallbackQuery
+):
 
-    Большинство раундов заканчиваются
-    на небольшом коэффициенте, но иногда
-    значение может быть значительно выше.
-    """
+    user_id = callback.from_user.id
 
-    value = random.expovariate(1.0 / 2.5)
-
-    crash_point = 1.00 + value
-
-    crash_point = max(
-        CRASH_MIN,
-        crash_point
+    games.pop(
+        user_id,
+        None
     )
 
-    crash_point = min(
-        CRASH_MAX,
-        crash_point
+    await callback.message.edit_text(
+        "💣 Игра отменена.",
+        reply_markup=after_game_keyboard()
     )
 
-    return round(
-        crash_point,
-        2
-    )
+    await callback.answer()
 
 
-def crash_keyboard():
-    return types.InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                types.InlineKeyboardButton(
-                    text="💰 | Забрать",
-                    callback_data="crash_cashout"
-                )
-            ],
-            [
-                types.InlineKeyboardButton(
-                    text="❌ | Отмена",
-                    callback_data="crash_cancel"
-                )
-            ]
-        ]
-    )
-
-
-def crash_text(game):
-    multiplier = game["multiplier"]
-
-    potential = int(
-        STAKE * multiplier
-    )
-
-    return (
-        "🧨 <b>CRASH</b>\n\n"
-        f"📈 Коэффициент: <b>x{multiplier:.2f}</b>\n"
-        f"💰 Ставка: <b>{STAKE}</b>\n"
-        f"💵 Сейчас можно забрать: <b>{potential}</b>\n\n"
-        "⚠️ Успейте забрать выигрыш до Crash!"
-    )
-
+# =========================
+# CRASH MENU
+# =========================
 
 @dp.callback_query(F.data == "game_crash")
-async def crash_menu_handler(callback: types.CallbackQuery):
+async def game_crash_handler(
+    callback: types.CallbackQuery
+):
+
+    balance = get_balance(
+        callback.from_user.id
+    )
+
     text = (
-        "🧨 <b>Crash</b>\n\n"
-        f"💰 Ставка: <b>{STAKE}</b>\n\n"
-        "Коэффициент начинает с x1.00 "
-        "и постепенно растёт.\n\n"
-        "💰 Нажмите «Забрать», чтобы "
-        "зафиксировать выигрыш.\n\n"
-        "💥 Если произойдёт Crash раньше — "
-        "ставка сгорает."
+        "🧨 <b>CRASH</b>\n\n"
+        f"💰 Ставка: <b>{STAKE}</b>\n"
+        f"💳 Баланс: <b>{balance}</b>\n\n"
+        "Нажми «Начать», чтобы запустить игру."
     )
 
     keyboard = types.InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 types.InlineKeyboardButton(
-                    text="🧨 | Начать",
+                    text="🚀 | Начать",
                     callback_data="crash_start"
                 )
             ],
@@ -1223,7 +1309,7 @@ async def crash_menu_handler(callback: types.CallbackQuery):
                     text="📂 | Назад",
                     callback_data="mini_games"
                 )
-            ]
+            ],
         ]
     )
 
@@ -1235,13 +1321,20 @@ async def crash_menu_handler(callback: types.CallbackQuery):
     await callback.answer()
 
 
+# =========================
+# CRASH START
+# =========================
+
 @dp.callback_query(F.data == "crash_start")
-async def crash_start_handler(callback: types.CallbackQuery):
+async def crash_start_handler(
+    callback: types.CallbackQuery
+):
+
     user_id = callback.from_user.id
 
     if user_id in games:
         await callback.answer(
-            "У вас уже есть активная игра!",
+            "У тебя уже есть активная игра",
             show_alert=True
         )
         return
@@ -1260,40 +1353,35 @@ async def crash_start_handler(callback: types.CallbackQuery):
 
     games[user_id] = {
         "type": "crash",
-        "multiplier": 1.00,
         "crash_point": crash_point,
-        "active": True,
-        "message_id": callback.message.message_id,
+        "multiplier": 1.00,
         "chat_id": callback.message.chat.id,
+        "message_id": callback.message.message_id,
         "task": None,
     }
 
-    game = games[user_id]
-
     await callback.message.edit_text(
-        crash_text(game),
+        crash_text(1.00),
         reply_markup=crash_keyboard()
     )
 
     task = asyncio.create_task(
-        crash_loop(
-            user_id,
-            callback.message.chat.id,
-            callback.message.message_id
-        )
+        crash_loop(user_id)
     )
 
-    game["task"] = task
+    games[user_id]["task"] = task
 
     await callback.answer()
 
 
-async def crash_loop(
-    user_id,
-    chat_id,
-    message_id
-):
+# =========================
+# CRASH LOOP
+# =========================
+
+async def crash_loop(user_id):
+
     while True:
+
         await asyncio.sleep(
             CRASH_SPEED
         )
@@ -1303,99 +1391,73 @@ async def crash_loop(
         if not game:
             return
 
-        if game.get("type") != "crash":
-            return
-
-        if not game.get("active"):
-            return
-
-        game["multiplier"] = round(
+        multiplier = round(
             game["multiplier"] + 0.05,
             2
         )
 
-        multiplier = game["multiplier"]
-        crash_point = game["crash_point"]
+        game["multiplier"] = multiplier
 
-        # Crash
-        if multiplier >= crash_point:
-            game["active"] = False
+        if multiplier >= game["crash_point"]:
 
-            text = (
-                "💥 <b>CRASH!</b>\n\n"
-                f"📉 Раунд закончился на "
-                f"<b>x{crash_point:.2f}</b>\n\n"
-                "❌ Вы не успели забрать выигрыш.\n"
-                f"💰 Потеряно: <b>{STAKE}</b>"
+            crash_point = game["crash_point"]
+
+            games.pop(
+                user_id,
+                None
+            )
+
+            balance = get_balance(
+                user_id
             )
 
             try:
                 await bot.edit_message_text(
-                    chat_id=chat_id,
-                    message_id=message_id,
-                    text=text,
-                    reply_markup=after_game_menu()
+                    chat_id=game["chat_id"],
+                    message_id=game["message_id"],
+                    text=(
+                        "🧨 <b>CRASH</b>\n\n"
+                        f"💥 Краш на <b>x{crash_point:.2f}</b>\n\n"
+                        "❌ Ставка проиграна.\n"
+                        f"💳 Баланс: <b>{balance}</b>"
+                    ),
+                    reply_markup=after_game_keyboard()
                 )
             except Exception:
                 pass
 
-            del games[user_id]
-
             return
-
-        # Обновляем коэффициент
-        potential = int(
-            STAKE * multiplier
-        )
-
-        text = (
-            "🧨 <b>CRASH</b>\n\n"
-            f"📈 Коэффициент: <b>x{multiplier:.2f}</b>\n"
-            f"💰 Ставка: <b>{STAKE}</b>\n"
-            f"💵 Сейчас можно забрать: "
-            f"<b>{potential}</b>\n\n"
-            "⚠️ Успейте забрать!"
-        )
 
         try:
             await bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=message_id,
-                text=text,
+                chat_id=game["chat_id"],
+                message_id=game["message_id"],
+                text=crash_text(multiplier),
                 reply_markup=crash_keyboard()
             )
         except Exception:
             pass
 
 
+# =========================
+# CRASH CASHOUT
+# =========================
+
 @dp.callback_query(F.data == "crash_cashout")
 async def crash_cashout_handler(
     callback: types.CallbackQuery
 ):
+
     user_id = callback.from_user.id
 
     game = games.get(user_id)
 
     if not game or game.get("type") != "crash":
         await callback.answer(
-            "❌ Игра уже закончилась",
+            "❌ Игра уже закончена",
             show_alert=True
         )
         return
-
-    if not game.get("active"):
-        await callback.answer(
-            "❌ Уже слишком поздно",
-            show_alert=True
-        )
-        return
-
-    game["active"] = False
-
-    task = game.get("task")
-
-    if task:
-        task.cancel()
 
     multiplier = game["multiplier"]
 
@@ -1408,94 +1470,297 @@ async def crash_cashout_handler(
         payout
     )
 
-    text = (
-        "🧨 <b>CRASH</b>\n\n"
-        "💰 <b>Вы забрали выигрыш!</b>\n\n"
-        f"📈 Коэффициент: <b>x{multiplier:.2f}</b>\n"
-        f"💵 Выигрыш: <b>{payout}</b>\n\n"
-        f"💳 Баланс: <b>{balance}</b>"
-    )
-
-    del games[user_id]
-
-    await callback.message.edit_text(
-        text,
-        reply_markup=after_game_menu()
-    )
-
-    await callback.answer(
-        f"💰 Забрано x{multiplier:.2f}!"
-    )
-
-
-@dp.callback_query(F.data == "crash_cancel")
-async def crash_cancel_handler(
-    callback: types.CallbackQuery
-):
-    user_id = callback.from_user.id
-
-    game = games.get(user_id)
-
-    if not game or game.get("type") != "crash":
-        await callback.answer(
-            "Игра уже закончилась"
-        )
-        return
-
-    if game.get("active"):
-        game["active"] = False
-
     task = game.get("task")
 
     if task:
         task.cancel()
 
-    balance = get_balance(user_id)
-
-    del games[user_id]
+    games.pop(
+        user_id,
+        None
+    )
 
     await callback.message.edit_text(
-        "🧨 <b>Crash</b>\n\n"
-        "❌ Игра отменена.\n\n"
-        "Ставка не возвращается.\n\n"
+        "🧨 <b>CRASH</b>\n\n"
+        f"🚀 Коэффициент: <b>x{multiplier:.2f}</b>\n\n"
+        f"🎉 Ты забрал: <b>{payout}</b>\n"
         f"💳 Баланс: <b>{balance}</b>",
-        reply_markup=after_game_menu()
+        reply_markup=after_game_keyboard()
     )
 
     await callback.answer()
 
 
-# ============================================================
-# 🎯 TELEGRAM DICE
-# ============================================================
+# =========================
+# CRASH CANCEL
+# =========================
+
+@dp.callback_query(F.data == "crash_cancel")
+async def crash_cancel_handler(
+    callback: types.CallbackQuery
+):
+
+    user_id = callback.from_user.id
+
+    game = games.get(user_id)
+
+    if game and game.get("type") == "crash":
+
+        task = game.get("task")
+
+        if task:
+            task.cancel()
+
+        games.pop(
+            user_id,
+            None
+        )
+
+    await callback.message.edit_text(
+        "🧨 Игра Crash отменена.",
+        reply_markup=after_game_keyboard()
+    )
+
+    await callback.answer()
+
+
+# =========================
+# DICE / SLOTS / BOWLING RESULTS
+# =========================
 
 @dp.message(F.dice)
 async def dice_handler(message: types.Message):
+
     user_id = message.from_user.id
-    dice = message.dice
 
     game = games.get(user_id)
 
     if not game:
         return
 
-    # =========================
-    # 🎳 БОУЛИНГ
-    # =========================
+    dice = message.dice
+
+    # -------------------------
+    # КУБИКИ
+    # -------------------------
+
+    if dice.emoji == "🎲":
+
+        if game["type"] == "dice_one":
+
+            value = dice.value
+            bet = game["bet"]
+
+            won = (
+                value < 3
+                if bet == "less"
+                else value > 3
+            )
+
+            if won:
+                payout = int(
+                    STAKE * 1.85
+                )
+
+                balance = change_balance(
+                    user_id,
+                    payout
+                )
+
+                text = (
+                    "🎲 <b>Кубики</b>\n\n"
+                    f"Выпало: <b>{value}</b>\n\n"
+                    "🎉 <b>Победа!</b>\n"
+                    f"💰 Выигрыш: <b>{payout}</b>\n"
+                    f"💳 Баланс: <b>{balance}</b>"
+                )
+
+            else:
+
+                balance = get_balance(
+                    user_id
+                )
+
+                text = (
+                    "🎲 <b>Кубики</b>\n\n"
+                    f"Выпало: <b>{value}</b>\n\n"
+                    "❌ <b>Проигрыш</b>\n"
+                    f"💳 Баланс: <b>{balance}</b>"
+                )
+
+            games.pop(
+                user_id,
+                None
+            )
+
+            await message.answer(
+                text,
+                reply_markup=after_game_keyboard()
+            )
+
+            return
+
+        if game["type"] == "dice_two":
+
+            if game["first"] is None:
+
+                game["first"] = dice.value
+
+                await message.answer(
+                    f"🎲 Первый бросок: <b>{dice.value}</b>\n\n"
+                    "🎲 Бросаю второй..."
+                )
+
+                await bot.send_dice(
+                    chat_id=message.chat.id,
+                    emoji="🎲"
+                )
+
+                return
+
+            first = game["first"]
+            second = dice.value
+            total = first + second
+            bet = game["bet"]
+
+            if bet == "equal":
+                won = total == 7
+                multiplier = 5.00
+
+            elif bet == "less":
+                won = total < 7
+                multiplier = 1.85
+
+            else:
+                won = total > 7
+                multiplier = 1.85
+
+            if won:
+
+                payout = int(
+                    STAKE * multiplier
+                )
+
+                balance = change_balance(
+                    user_id,
+                    payout
+                )
+
+                text = (
+                    "🎲🎲 <b>Кубики</b>\n\n"
+                    f"Первый: <b>{first}</b>\n"
+                    f"Второй: <b>{second}</b>\n"
+                    f"Сумма: <b>{total}</b>\n\n"
+                    "🎉 <b>Победа!</b>\n"
+                    f"💰 Выигрыш: <b>{payout}</b>\n"
+                    f"💳 Баланс: <b>{balance}</b>"
+                )
+
+            else:
+
+                balance = get_balance(
+                    user_id
+                )
+
+                text = (
+                    "🎲🎲 <b>Кубики</b>\n\n"
+                    f"Первый: <b>{first}</b>\n"
+                    f"Второй: <b>{second}</b>\n"
+                    f"Сумма: <b>{total}</b>\n\n"
+                    "❌ <b>Проигрыш</b>\n"
+                    f"💳 Баланс: <b>{balance}</b>"
+                )
+
+            games.pop(
+                user_id,
+                None
+            )
+
+            await message.answer(
+                text,
+                reply_markup=after_game_keyboard()
+            )
+
+            return
+
+    # -------------------------
+    # СЛОТЫ
+    # -------------------------
+
+    if dice.emoji == "🎰":
+
+        if game["type"] != "slots":
+            return
+
+        result, multiplier = slot_result(
+            dice.value
+        )
+
+        result_text = " ".join(result)
+
+        if multiplier > 0:
+
+            payout = int(
+                STAKE * multiplier
+            )
+
+            balance = change_balance(
+                user_id,
+                payout
+            )
+
+            text = (
+                "🎰 <b>Слоты</b>\n\n"
+                f"{result_text}\n\n"
+                f"🎉 <b>Победа x{multiplier}</b>\n"
+                f"💰 Выигрыш: <b>{payout}</b>\n"
+                f"💳 Баланс: <b>{balance}</b>"
+            )
+
+        else:
+
+            balance = get_balance(
+                user_id
+            )
+
+            text = (
+                "🎰 <b>Слоты</b>\n\n"
+                f"{result_text}\n\n"
+                "❌ <b>Проигрыш</b>\n"
+                f"💳 Баланс: <b>{balance}</b>"
+            )
+
+        games.pop(
+            user_id,
+            None
+        )
+
+        await message.answer(
+            text,
+            reply_markup=after_game_keyboard()
+        )
+
+        return
+
+    # -------------------------
+    # БОУЛИНГ
+    # -------------------------
 
     if dice.emoji == "🎳":
-        if game.get("type") != "bowling":
+
+        if game["type"] != "bowling":
             return
 
         value = dice.value
         bet = game["bet"]
 
         if bet == "more":
-            win = value > 3
+            won = value > 3
         else:
-            win = value < 3
+            won = value < 3
 
-        if win:
+        if won:
+
             payout = int(
                 STAKE * 1.85
             )
@@ -1508,292 +1773,64 @@ async def dice_handler(message: types.Message):
             text = (
                 "🎳 <b>Боулинг</b>\n\n"
                 f"Выпало: <b>{value}</b>\n\n"
-                "🎉 Победа!\n"
-                f"💰 Выигрыш: <b>{payout}</b>\n\n"
+                "🎉 <b>Победа!</b>\n"
+                f"💰 Выигрыш: <b>{payout}</b>\n"
                 f"💳 Баланс: <b>{balance}</b>"
             )
 
         else:
-            balance = get_balance(user_id)
+
+            balance = get_balance(
+                user_id
+            )
 
             text = (
                 "🎳 <b>Боулинг</b>\n\n"
                 f"Выпало: <b>{value}</b>\n\n"
-                "❌ Вы проиграли.\n\n"
+                "❌ <b>Проигрыш</b>\n"
                 f"💳 Баланс: <b>{balance}</b>"
             )
 
-        del games[user_id]
+        games.pop(
+            user_id,
+            None
+        )
 
         await message.answer(
             text,
-            reply_markup=after_game_menu()
+            reply_markup=after_game_keyboard()
         )
 
         return
 
-    # =========================
-    # 🎰 СЛОТЫ
-    # =========================
 
-    if dice.emoji == "🎰":
-        if game.get("type") != "slots":
-            return
+# =========================
+# ERROR HANDLER
+# =========================
 
-        result, multiplier = slot_result(
-            dice.value
+@dp.errors()
+async def error_handler(event):
+
+    print(
+        "BOT ERROR:",
+        event.exception
+    )
+
+
+# =========================
+# LOCAL START
+# =========================
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=int(
+            os.getenv(
+                "PORT",
+                "8000"
+            )
         )
-
-        result_text = " ".join(result)
-
-        if multiplier > 0:
-            payout = int(
-                STAKE * multiplier
-            )
-
-            balance = change_balance(
-                user_id,
-                payout
-            )
-
-            text = (
-                "🎰 <b>Слоты</b>\n\n"
-                f"{result_text}\n\n"
-                "🎉 Победа!\n"
-                f"📈 Коэффициент: <b>x{multiplier}</b>\n"
-                f"💰 Выигрыш: <b>{payout}</b>\n\n"
-                f"💳 Баланс: <b>{balance}</b>"
-            )
-
-        else:
-            balance = get_balance(user_id)
-
-            text = (
-                "🎰 <b>Слоты</b>\n\n"
-                f"{result_text}\n\n"
-                "❌ Нет совпадений.\n\n"
-                f"💳 Баланс: <b>{balance}</b>"
-            )
-
-        del games[user_id]
-
-        await message.answer(
-            text,
-            reply_markup=after_game_menu()
-        )
-
-        return
-
-    # =========================
-    # 🎲 КУБИКИ
-    # =========================
-
-    if dice.emoji == "🎲":
-
-        # 1 кубик
-        if game.get("type") == "dice_one":
-            value = dice.value
-            bet = game.get("bet")
-
-            if bet == "less":
-                win = value < 3
-            else:
-                win = value > 3
-
-            if win:
-                payout = int(
-                    STAKE * DICE_ONE_MULTIPLIER
-                )
-
-                balance = change_balance(
-                    user_id,
-                    payout
-                )
-
-                text = (
-                    "🎲 <b>Кубики</b>\n\n"
-                    f"Выпало: <b>{value}</b>\n\n"
-                    "🎉 Победа!\n"
-                    f"💰 Выигрыш: <b>{payout}</b>\n\n"
-                    f"💳 Баланс: <b>{balance}</b>"
-                )
-
-            else:
-                balance = get_balance(
-                    user_id
-                )
-
-                text = (
-                    "🎲 <b>Кубики</b>\n\n"
-                    f"Выпало: <b>{value}</b>\n\n"
-                    "❌ Вы проиграли.\n\n"
-                    f"💳 Баланс: <b>{balance}</b>"
-                )
-
-            del games[user_id]
-
-            await message.answer(
-                text,
-                reply_markup=after_game_menu()
-            )
-
-            return
-
-        # 2 кубика
-        if game.get("type") == "dice_two":
-
-            if game["first"] is None:
-                game["first"] = dice.value
-
-                await message.answer(
-                    "🎲 <b>Первый кубик:</b> "
-                    f"{dice.value}\n\n"
-                    "Бросаем второй 🎲"
-                )
-
-                await bot.send_dice(
-                    message.chat.id,
-                    emoji="🎲"
-                )
-
-                return
-
-            first = game["first"]
-            second = dice.value
-            total = first + second
-
-            if total == 7:
-                multiplier = (
-                    DICE_TWO_EQUAL_MULTIPLIER
-                )
-            else:
-                multiplier = (
-                    DICE_TWO_MULTIPLIER
-                )
-
-            payout = int(
-                STAKE * multiplier
-            )
-
-            balance = change_balance(
-                user_id,
-                payout
-            )
-
-            if total == 7:
-                result_text = (
-                    "🎉 Равно 7!"
-                )
-            elif total < 7:
-                result_text = (
-                    "🎉 Меньше 7!"
-                )
-            else:
-                result_text = (
-                    "🎉 Больше 7!"
-                )
-
-            text = (
-                "🎲 <b>Кубики</b>\n\n"
-                f"Первый: <b>{first}</b>\n"
-                f"Второй: <b>{second}</b>\n"
-                f"Сумма: <b>{total}</b>\n\n"
-                f"{result_text}\n"
-                f"📈 Коэффициент: <b>x{multiplier}</b>\n"
-                f"💰 Выигрыш: <b>{payout}</b>\n\n"
-                f"💳 Баланс: <b>{balance}</b>"
-            )
-
-            del games[user_id]
-
-            await message.answer(
-                text,
-                reply_markup=after_game_menu()
-            )
-
-            return
-
-
-# ============================================================
-# WEBHOOK
-# ============================================================
-
-@app.get("/")
-async def root():
-    return {
-        "status": "ok",
-        "bot": "Emoji Casino"
-    }
-
-
-@app.post(
-    f"/webhook/{WEBHOOK_SECRET}"
-)
-async def webhook(request: Request):
-    data = await request.json()
-
-    update = types.Update.model_validate(
-        data
     )
-
-    await dp.feed_update(
-        bot,
-        update
-    )
-
-    return {
-        "ok": True
-    }
-
-
-# ============================================================
-# STARTUP
-# ============================================================
-
-@app.on_event("startup")
-async def startup():
-    init_db()
-
-    webhook_url = (
-        "https://emoji-casino-bot.onrender.com/"
-        f"webhook/{WEBHOOK_SECRET}"
-    )
-
-    print(
-        "SETTING WEBHOOK:",
-        webhook_url
-    )
-
-    await bot.set_webhook(
-        webhook_url,
-        allowed_updates=[
-            "message",
-            "callback_query"
-        ]
-    )
-
-    info = await bot.get_webhook_info()
-
-    print(
-        "WEBHOOK URL:",
-        info.url
-    )
-
-    print(
-        "PENDING UPDATES:",
-        info.pending_update_count
-    )
-
-    print(
-        "LAST ERROR:",
-        info.last_error_message
-    )
-
-
-# ============================================================
-# SHUTDOWN
-# ============================================================
-
-@app.on_event("shutdown")
-async def shutdown():
-    await bot.session.close()
