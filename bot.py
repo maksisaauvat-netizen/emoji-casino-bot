@@ -1,6 +1,7 @@
 import asyncio
 import os
 import random
+import sqlite3
 
 from fastapi import FastAPI, Request
 
@@ -18,6 +19,7 @@ from database import (
     get_user_stats,
     get_game_history,
     record_game,
+    DB_PATH,
 )
 
 
@@ -65,6 +67,8 @@ STAKE_OPTIONS = [
     500,
     1000,
 ]
+
+HISTORY_PAGE_SIZE = 5
 
 
 # =========================================================
@@ -132,11 +136,6 @@ MINES_MULTIPLIERS = {
 
 CRASH_MIN = 1.00
 CRASH_MAX = 20.00
-
-# Настройка вероятности Crash.
-# Чем меньше значение, тем чаще будут ранние Crash.
-# Было: 2.5
-# Сейчас: 2.1
 CRASH_MEAN = 2.1
 
 
@@ -239,9 +238,11 @@ def after_game_menu():
 # =========================================================
 
 def stake_menu(game_name: str):
+
     builder = InlineKeyboardBuilder()
 
     for amount in STAKE_OPTIONS:
+
         builder.button(
             text=f"💰  {money(amount)} ₽",
             callback_data=f"stake_{game_name}_{amount}"
@@ -261,6 +262,7 @@ def stake_card(
     game_title: str,
     balance: int
 ):
+
     return (
         f"<b>{game_title}</b>\n\n"
         f"💰 <b>БАЛАНС</b>\n"
@@ -405,12 +407,129 @@ async def profile_callback(callback: CallbackQuery):
 
 
 # =========================================================
-# HISTORY
+# HISTORY HELPERS
 # =========================================================
 
-def history_keyboard():
+def history_game_name(game):
+
+    names = {
+        "dice_one": "🎲 Кубик",
+        "dice_two": "🎲🎲 2 Кубика",
+        "slots": "🎰 Слоты",
+        "roulette": "🎡 Рулетка",
+        "bowling": "🎳 Боулинг",
+        "mines": "💣 Мины",
+        "crash": "🧨 Crash",
+    }
+
+    return names.get(
+        game,
+        game
+    )
+
+
+def format_history_date(created_at):
+
+    if not created_at:
+        return ""
+
+    try:
+
+        date_part, time_part = created_at.split(" ")
+
+        year, month, day = date_part.split("-")
+
+        hour, minute = time_part.split(":")[:2]
+
+        return (
+            f"{day}.{month}.{year} "
+            f"{hour}:{minute} UTC"
+        )
+
+    except Exception:
+
+        return str(created_at)
+
+
+def get_history_total(user_id):
+
+    connection = sqlite3.connect(DB_PATH)
+
+    row = connection.execute(
+        """
+        SELECT COUNT(*)
+        FROM game_history
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    ).fetchone()
+
+    connection.close()
+
+    return row[0] if row else 0
+
+
+def clear_user_history(user_id):
+
+    connection = sqlite3.connect(DB_PATH)
+
+    connection.execute(
+        """
+        DELETE FROM game_history
+        WHERE user_id = ?
+        """,
+        (user_id,)
+    )
+
+    connection.commit()
+
+    connection.close()
+
+
+# =========================================================
+# HISTORY KEYBOARD
+# =========================================================
+
+def history_keyboard(
+    page: int,
+    total: int
+):
 
     builder = InlineKeyboardBuilder()
+
+    total_pages = max(
+        1,
+        (total + HISTORY_PAGE_SIZE - 1)
+        // HISTORY_PAGE_SIZE
+    )
+
+    if total_pages > 1:
+
+        if page > 0:
+
+            builder.button(
+                text="◀️",
+                callback_data=f"history_page_{page - 1}"
+            )
+
+        builder.button(
+            text=f"📄 {page + 1}/{total_pages}",
+            callback_data="history_current"
+        )
+
+        if page < total_pages - 1:
+
+            builder.button(
+                text="▶️",
+                callback_data=f"history_page_{page + 1}"
+            )
+
+        builder.adjust(3)
+
+    builder.button(
+        text="🗑️  ОЧИСТИТЬ ИСТОРИЮ",
+        callback_data="history_clear"
+    )
 
     builder.button(
         text="👤  ПРОФИЛЬ",
@@ -427,32 +546,135 @@ def history_keyboard():
     return builder.as_markup()
 
 
-def history_game_name(game):
+# =========================================================
+# HISTORY TEXT
+# =========================================================
 
-    names = {
-        "dice_one": "🎲 Кубик",
-        "dice_two": "🎲🎲 2 Кубика",
-        "slots": "🎰 Слоты",
-        "roulette": "🎡 Рулетка",
-        "bowling": "🎳 Боуллинг",
-        "mines": "💣 Мины",
-        "crash": "🧨 Crash",
-    }
+def build_history_text(
+    history,
+    page: int,
+    total: int
+):
 
-    return names.get(
-        game,
-        game
+    total_pages = max(
+        1,
+        (total + HISTORY_PAGE_SIZE - 1)
+        // HISTORY_PAGE_SIZE
     )
 
+    lines = [
+        "📜 <b>ИСТОРИЯ ИГР</b>",
+        "",
+        "━━━━━━━━━━━━━━━━━━",
+        "",
+        f"📄 Страница <b>{page + 1}</b> из <b>{total_pages}</b>",
+        ""
+    ]
 
-@dp.callback_query(F.data == "history")
-async def history_callback(callback: CallbackQuery):
+    for item in history:
+
+        game_name = history_game_name(
+            item["game"]
+        )
+
+        stake = item["stake"]
+        result = item["result"]
+        multiplier = item["multiplier"]
+        payout = item["payout"]
+        created_at = item["created_at"]
+
+        date_text = format_history_date(
+            created_at
+        )
+
+        if result == "win":
+
+            result_icon = "🟢"
+            result_text = (
+                f"+{money(payout)} ₽"
+            )
+
+        else:
+
+            result_icon = "🔴"
+            result_text = (
+                f"-{money(stake)} ₽"
+            )
+
+        if multiplier > 0:
+
+            multiplier_text = (
+                f" • x{multiplier:g}"
+            )
+
+        else:
+
+            multiplier_text = ""
+
+        lines.append(
+            f"{result_icon} <b>{game_name}</b>"
+        )
+
+        lines.append(
+            f"   💰 Ставка: {money(stake)} ₽"
+            f"{multiplier_text}"
+        )
+
+        lines.append(
+            f"   💎 Результат: <b>{result_text}</b>"
+        )
+
+        if date_text:
+
+            lines.append(
+                f"   🕐 {date_text}"
+            )
+
+        lines.append(
+            "   ─────────────────"
+        )
+
+    lines.append(
+        "━━━━━━━━━━━━━━━━━━"
+    )
+
+    lines.append(
+        f"🎮 Всего игр: <b>{total}</b>"
+    )
+
+    return "\n".join(lines)
+
+
+# =========================================================
+# HISTORY
+# =========================================================
+
+async def show_history(
+    callback: CallbackQuery,
+    page: int = 0
+):
 
     user_id = callback.from_user.id
 
+    total = get_history_total(
+        user_id
+    )
+
+    total_pages = max(
+        1,
+        (total + HISTORY_PAGE_SIZE - 1)
+        // HISTORY_PAGE_SIZE
+    )
+
+    page = max(
+        0,
+        min(page, total_pages - 1)
+    )
+
     history = get_game_history(
         user_id,
-        limit=10
+        limit=HISTORY_PAGE_SIZE,
+        offset=page * HISTORY_PAGE_SIZE
     )
 
     if not history:
@@ -460,81 +682,185 @@ async def history_callback(callback: CallbackQuery):
         text = (
             "📜 <b>ИСТОРИЯ ИГР</b>\n\n"
             "━━━━━━━━━━━━━━━━━━\n\n"
-            "🎮 Здесь пока нет сыгранных игр.\n\n"
+            "🎮 <b>История пока пуста.</b>\n\n"
             "Начни играть, и результаты появятся здесь."
         )
 
     else:
 
-        lines = [
-            "📜 <b>ИСТОРИЯ ИГР</b>",
-            "",
-            "━━━━━━━━━━━━━━━━━━",
-            ""
-        ]
-
-        for item in history:
-
-            game_name = history_game_name(
-                item["game"]
-            )
-
-            stake = item["stake"]
-            result = item["result"]
-            multiplier = item["multiplier"]
-            payout = item["payout"]
-
-            if result == "win":
-
-                result_icon = "🟢"
-                result_text = (
-                    f"+{money(payout)} ₽"
-                )
-
-            else:
-
-                result_icon = "🔴"
-                result_text = (
-                    f"-{money(stake)} ₽"
-                )
-
-            if multiplier > 0:
-
-                multiplier_text = (
-                    f" • x{multiplier:g}"
-                )
-
-            else:
-
-                multiplier_text = ""
-
-            lines.append(
-                f"{result_icon} {game_name}"
-            )
-
-            lines.append(
-                f"   Ставка: {money(stake)} ₽"
-                f"{multiplier_text}"
-            )
-
-            lines.append(
-                f"   Результат: <b>{result_text}</b>"
-            )
-
-            lines.append("")
-
-        lines.append(
-            "━━━━━━━━━━━━━━━━━━"
+        text = build_history_text(
+            history,
+            page,
+            total
         )
-
-        text = "\n".join(lines)
 
     await callback.message.edit_text(
         text,
-        reply_markup=history_keyboard()
+        reply_markup=history_keyboard(
+            page,
+            total
+        )
+    )
+
+
+@dp.callback_query(F.data == "history")
+async def history_callback(
+    callback: CallbackQuery
+):
+
+    await show_history(
+        callback,
+        page=0
     )
 
     await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("history_page_"))
+async def history_page_callback(
+    callback: CallbackQuery
+):
+
+    try:
+
+        page = int(
+            callback.data.split("_")[-1]
+        )
+
+    except ValueError:
+
+        await callback.answer(
+            "Ошибка страницы.",
+            show_alert=True
+        )
+
+        return
+
+    await show_history(
+        callback,
+        page=page
+    )
+
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "history_current")
+async def history_current_callback(
+    callback: CallbackQuery
+):
+
+    await callback.answer(
+        "Ты уже на этой странице."
+    )
+
+
+# =========================================================
+# CLEAR HISTORY
+# =========================================================
+
+def clear_history_confirm_keyboard():
+
+    builder = InlineKeyboardBuilder()
+
+    builder.button(
+        text="⚠️  ДА, УДАЛИТЬ",
+        callback_data="history_clear_confirm"
+    )
+
+    builder.button(
+        text="❌  ОТМЕНА",
+        callback_data="history"
+    )
+
+    builder.adjust(1)
+
+    return builder.as_markup()
+
+
+@dp.callback_query(F.data == "history_clear")
+async def history_clear_callback(
+    callback: CallbackQuery
+):
+
+    user_id = callback.from_user.id
+
+    total = get_history_total(
+        user_id
+    )
+
+    if total == 0:
+
+        await callback.answer(
+            "История уже пуста.",
+            show_alert=True
+        )
+
+        return
+
+    text = (
+        "🗑️ <b>ОЧИСТКА ИСТОРИИ</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        f"В истории сейчас: <b>{total}</b> игр.\n\n"
+        "⚠️ <b>Все записи твоих игр будут удалены.</b>\n\n"
+        "Баланс, статистика побед и другие данные "
+        "профиля при этом не изменятся.\n\n"
+        "Это действие нельзя отменить."
+    )
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=clear_history_confirm_keyboard()
+    )
+
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "history_clear_confirm")
+async def history_clear_confirm_callback(
+    callback: CallbackQuery
+):
+
+    user_id = callback.from_user.id
+
+    clear_user_history(
+        user_id
+    )
+
+    text = (
+        "🗑️ <b>ИСТОРИЯ ОЧИЩЕНА</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "✅ Все записи истории игр удалены.\n\n"
+        "💡 Статистика профиля и баланс "
+        "остались без изменений."
+    )
+
+    builder = InlineKeyboardBuilder()
+
+    builder.button(
+        text="📜  ИСТОРИЯ",
+        callback_data="history"
+    )
+
+    builder.button(
+        text="👤  ПРОФИЛЬ",
+        callback_data="profile"
+    )
+
+    builder.button(
+        text="📂  МЕНЮ",
+        callback_data="menu"
+    )
+
+    builder.adjust(1)
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=builder.as_markup()
+    )
+
+    await callback.answer(
+        "История удалена."
+    )
 
 
 # =========================================================
@@ -542,7 +868,9 @@ async def history_callback(callback: CallbackQuery):
 # =========================================================
 
 @dp.callback_query(F.data == "mini_games")
-async def mini_games_callback(callback: CallbackQuery):
+async def mini_games_callback(
+    callback: CallbackQuery
+):
 
     user_id = callback.from_user.id
 
@@ -651,7 +979,9 @@ def dice_two_menu():
 
 
 @dp.callback_query(F.data == "dice")
-async def dice_callback(callback: CallbackQuery):
+async def dice_callback(
+    callback: CallbackQuery
+):
 
     user_id = callback.from_user.id
 
@@ -2257,10 +2587,6 @@ async def crash_loop(
         crash_point = game["crash_point"]
         stake = game["stake"]
 
-        # =================================================
-        # CRASH
-        # =================================================
-
         if multiplier >= crash_point:
 
             game["active"] = False
@@ -2299,10 +2625,6 @@ async def crash_loop(
                 del games[user_id]
 
             return
-
-        # =================================================
-        # ANIMATION
-        # =================================================
 
         indicator = crash_indicator(
             multiplier
@@ -2419,10 +2741,6 @@ async def crash_cancel_callback(
     game["active"] = False
 
     stake = game["stake"]
-
-    # ==============================================
-    # ВОЗВРАЩАЕМ СТАВКУ
-    # ==============================================
 
     change_balance(
         user_id,
