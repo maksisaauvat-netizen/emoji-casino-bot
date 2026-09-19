@@ -35,9 +35,8 @@ bot = Bot(TOKEN)
 dp = Dispatcher()
 app = FastAPI()
 
-
-# Временное состояние текущей игры.
-# Баланс при этом хранится в SQLite.
+# Активные игры пользователей.
+# Деньги при этом хранятся в SQLite.
 games = {}
 
 
@@ -49,7 +48,7 @@ def games_menu():
                     text="🎲 | Кубики",
                     callback_data="game_dice",
                 )
-            ],
+            ]
         ]
     )
 
@@ -61,13 +60,13 @@ def dice_modes():
                 InlineKeyboardButton(
                     text="🎲 1 бросок",
                     callback_data="dice_mode_1",
-                ),
+                )
             ],
             [
                 InlineKeyboardButton(
                     text="🎲 2 броска",
                     callback_data="dice_mode_2",
-                ),
+                )
             ],
         ]
     )
@@ -80,13 +79,13 @@ def dice_one_predictions():
                 InlineKeyboardButton(
                     text="x1.85 | Меньше 3",
                     callback_data="dice_one_less",
-                ),
+                )
             ],
             [
                 InlineKeyboardButton(
                     text="x1.85 | Больше 3",
                     callback_data="dice_one_more",
-                ),
+                )
             ],
         ]
     )
@@ -99,19 +98,19 @@ def dice_two_predictions():
                 InlineKeyboardButton(
                     text="x1.85 | Меньше 7",
                     callback_data="dice_two_less",
-                ),
+                )
             ],
             [
                 InlineKeyboardButton(
                     text="x5.00 | Равно 7",
                     callback_data="dice_two_equal",
-                ),
+                )
             ],
             [
                 InlineKeyboardButton(
                     text="x1.85 | Больше 7",
                     callback_data="dice_two_more",
-                ),
+                )
             ],
         ]
     )
@@ -124,13 +123,13 @@ def after_game_keyboard():
                 InlineKeyboardButton(
                     text="🎲 | Бросить ещё раз",
                     callback_data="dice_again",
-                ),
+                )
             ],
             [
                 InlineKeyboardButton(
                     text="⬅️ | К играм",
                     callback_data="games_menu",
-                ),
+                )
             ],
         ]
     )
@@ -139,8 +138,7 @@ def after_game_keyboard():
 async def start_dice_game(callback):
     user_id = callback.from_user.id
 
-    # Если у пользователя уже есть незавершённая игра,
-    # не списываем деньги повторно.
+    # Нельзя создать второй раунд поверх существующего.
     if user_id in games:
         await callback.answer(
             "🎲 У тебя уже есть активная игра.",
@@ -157,7 +155,7 @@ async def start_dice_game(callback):
         )
         return
 
-    # Списываем 100 только здесь — один раз при создании игры.
+    # Списываем 100 только один раз.
     success = subtract_balance(user_id, 100)
 
     if not success:
@@ -167,7 +165,6 @@ async def start_dice_game(callback):
         )
         return
 
-    # Раунд создан только после успешного списания.
     games[user_id] = {
         "stake": 100,
         "mode": None,
@@ -214,7 +211,7 @@ async def message_handler(message):
         )
         return
 
-    # Пользователь должен отправить именно 🎲
+    # Принимаем только сообщение с одним эмодзи 🎲.
     if message.text and message.text.strip() == "🎲":
         game = games.get(user_id)
 
@@ -227,9 +224,12 @@ async def message_handler(message):
         if game["mode"] is None or game["prediction"] is None:
             return
 
-        # Раунд завершается сразу после первого принятого 🎲.
+        # Сразу закрываем раунд.
         game["completed"] = True
 
+        # -------------------------
+        # 1 КУБИК
+        # -------------------------
         if game["mode"] == 1:
             result = random.randint(1, 6)
 
@@ -237,11 +237,10 @@ async def message_handler(message):
 
             if prediction == "less":
                 win = result in (1, 2)
-                coefficient = 1.85
             else:
                 win = result in (4, 5, 6)
-                coefficient = 1.85
 
+            coefficient = 1.85
             payout = 185 if win else 0
 
             if payout > 0:
@@ -261,6 +260,9 @@ async def message_handler(message):
             )
             return
 
+        # -------------------------
+        # 2 КУБИКА
+        # -------------------------
         if game["mode"] == 2:
             first = random.randint(1, 6)
             second = random.randint(1, 6)
@@ -279,10 +281,7 @@ async def message_handler(message):
                 coefficient = 1.85
 
             if win:
-                if coefficient == 5.00:
-                    payout = 500
-                else:
-                    payout = 185
+                payout = 500 if coefficient == 5.00 else 185
             else:
                 payout = 0
 
@@ -310,6 +309,9 @@ async def callback_handler(callback):
 
     user_id = callback.from_user.id
 
+    # -------------------------
+    # КНОПКА ИГРАТЬ
+    # -------------------------
     if callback.data == "play":
         balance = get_balance(user_id)
 
@@ -323,10 +325,16 @@ async def callback_handler(callback):
         )
         return
 
+    # -------------------------
+    # КУБИКИ
+    # -------------------------
     if callback.data == "game_dice":
         await start_dice_game(callback)
         return
 
+    # -------------------------
+    # 1 БРОСОК
+    # -------------------------
     if callback.data == "dice_mode_1":
         game = games.get(user_id)
 
@@ -348,6 +356,9 @@ async def callback_handler(callback):
         )
         return
 
+    # -------------------------
+    # 2 БРОСКА
+    # -------------------------
     if callback.data == "dice_mode_2":
         game = games.get(user_id)
 
@@ -369,6 +380,9 @@ async def callback_handler(callback):
         )
         return
 
+    # -------------------------
+    # ПРОГНОЗ
+    # -------------------------
     if callback.data in (
         "dice_one_less",
         "dice_one_more",
@@ -399,35 +413,33 @@ async def callback_handler(callback):
             else:
                 game["prediction"] = "more"
 
-        else:
-            await callback.answer(
-                "❌ Сначала выбери режим.",
-                show_alert=True,
-            )
-            return
-
         await callback.answer()
 
         if game["mode"] == 1:
-            text = (
+            await callback.message.answer(
                 "🎲 Отправь эмодзи 🎲, чтобы бросить кубик."
             )
         else:
-            text = (
+            await callback.message.answer(
                 "🎲 Отправь эмодзи 🎲, чтобы бросить кубики."
             )
 
-        await callback.message.answer(text)
         return
 
+    # -------------------------
+    # БРОСИТЬ ЕЩЁ РАЗ
+    # -------------------------
     if callback.data == "dice_again":
         await start_dice_game(callback)
         return
 
+    # -------------------------
+    # К ИГРАМ
+    # -------------------------
     if callback.data == "games_menu":
-        balance = get_balance(user_id)
-
         games.pop(user_id, None)
+
+        balance = get_balance(user_id)
 
         await callback.answer()
 
@@ -464,6 +476,10 @@ async def startup():
     print("LAST ERROR:", info.last_error_message)
 
 
+# ВАЖНО:
+# Здесь НЕ удаляем webhook.
+# Иначе старый экземпляр Render может удалить webhook
+# после запуска нового экземпляра.
 @app.on_event("shutdown")
 async def shutdown():
     await bot.session.close()
