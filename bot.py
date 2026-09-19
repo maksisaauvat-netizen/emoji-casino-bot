@@ -1,5 +1,4 @@
 import os
-import random
 
 from fastapi import FastAPI, Request, Header, HTTPException
 from aiogram import Bot, Dispatcher
@@ -35,9 +34,15 @@ bot = Bot(TOKEN)
 dp = Dispatcher()
 app = FastAPI()
 
-# Активные игры пользователей
+
+# Активные игры пользователей.
+# Деньги хранятся в SQLite.
 games = {}
 
+
+# =========================
+# КЛАВИАТУРЫ
+# =========================
 
 def games_menu():
     return InlineKeyboardMarkup(
@@ -134,9 +139,14 @@ def after_game_keyboard():
     )
 
 
+# =========================
+# НАЧАЛО ИГРЫ В КУБИКИ
+# =========================
+
 async def start_dice_game(callback):
     user_id = callback.from_user.id
 
+    # Не разрешаем создать второй раунд.
     if user_id in games:
         await callback.answer(
             "🎲 У тебя уже есть активная игра.",
@@ -153,6 +163,7 @@ async def start_dice_game(callback):
         )
         return
 
+    # Списываем ставку.
     success = subtract_balance(user_id, 100)
 
     if not success:
@@ -162,6 +173,7 @@ async def start_dice_game(callback):
         )
         return
 
+    # Создаём активную игру.
     games[user_id] = {
         "stake": 100,
         "mode": None,
@@ -182,9 +194,17 @@ async def start_dice_game(callback):
     )
 
 
+# =========================
+# ОБРАБОТКА СООБЩЕНИЙ
+# =========================
+
 @dp.message()
 async def message_handler(message):
     user_id = message.from_user.id
+
+    # -------------------------
+    # /start
+    # -------------------------
 
     if message.text == "/start":
         balance = get_balance(user_id)
@@ -208,9 +228,22 @@ async def message_handler(message):
         )
         return
 
-    # Распознаём сообщение с эмодзи кубика.
-    # Используем поиск по тексту, а не строгое сравнение.
-    if message.text and "🎲" in message.text:
+    # -------------------------
+    # НАСТОЯЩИЙ TELEGRAM DICE
+    # -------------------------
+    #
+    # Telegram присылает кубик
+    # не в message.text,
+    # а в message.dice.
+    #
+
+    if message.dice is not None:
+        dice = message.dice
+
+        # Нас интересует именно 🎲.
+        if dice.emoji != "🎲":
+            return
+
         game = games.get(user_id)
 
         if not game:
@@ -219,31 +252,44 @@ async def message_handler(message):
         if game["completed"]:
             return
 
-        if game["mode"] is None or game["prediction"] is None:
+        if game["mode"] is None:
             return
 
-        # Сразу закрываем раунд,
-        # чтобы повторное сообщение не дало вторую выплату.
+        if game["prediction"] is None:
+            return
+
+        # Значение настоящего Telegram Dice.
+        result = dice.value
+
+        # Сразу закрываем раунд.
+        # Это предотвращает повторную выплату.
         game["completed"] = True
 
         # =========================
         # 1 КУБИК
         # =========================
+
         if game["mode"] == 1:
-            result = random.randint(1, 6)
 
             prediction = game["prediction"]
 
             if prediction == "less":
-                win = result in (1, 2)
+                win = result < 3
             else:
-                win = result in (4, 5, 6)
+                win = result > 3
 
             coefficient = 1.85
-            payout = 185 if win else 0
+
+            if win:
+                payout = 185
+            else:
+                payout = 0
 
             if payout > 0:
-                balance = change_balance(user_id, payout)
+                balance = change_balance(
+                    user_id,
+                    payout,
+                )
             else:
                 balance = get_balance(user_id)
 
@@ -257,14 +303,42 @@ async def message_handler(message):
                 f"💎 Баланс: {balance} 💎",
                 reply_markup=after_game_keyboard(),
             )
+
             return
 
         # =========================
         # 2 КУБИКА
         # =========================
+        #
+        # Первый настоящий Telegram Dice
+        # уже пришёл.
+        #
+        # Для режима 2 бросков сохраняем
+        # первый результат и ждём второй.
+        #
+
         if game["mode"] == 2:
-            first = random.randint(1, 6)
-            second = random.randint(1, 6)
+
+            # Если это первый кубик.
+            if "first_dice" not in game:
+
+                game["first_dice"] = result
+
+                # Первый бросок не завершает игру.
+                game["completed"] = False
+
+                await message.answer(
+                    f"🎲 Первый кубик: {result}\n\n"
+                    f"Теперь отправь 🎲 ещё раз — "
+                    f"это будет второй кубик."
+                )
+
+                return
+
+            # Второй кубик.
+            first = game["first_dice"]
+            second = result
+
             total = first + second
 
             prediction = game["prediction"]
@@ -290,7 +364,10 @@ async def message_handler(message):
                 payout = 0
 
             if payout > 0:
-                balance = change_balance(user_id, payout)
+                balance = change_balance(
+                    user_id,
+                    payout,
+                )
             else:
                 balance = get_balance(user_id)
 
@@ -304,8 +381,13 @@ async def message_handler(message):
                 f"💎 Баланс: {balance} 💎",
                 reply_markup=after_game_keyboard(),
             )
+
             return
 
+
+# =========================
+# CALLBACK-КНОПКИ
+# =========================
 
 @dp.callback_query()
 async def callback_handler(callback):
@@ -313,10 +395,12 @@ async def callback_handler(callback):
 
     user_id = callback.from_user.id
 
-    # =========================
+    # -------------------------
     # ИГРАТЬ
-    # =========================
+    # -------------------------
+
     if callback.data == "play":
+
         balance = get_balance(user_id)
 
         await callback.answer()
@@ -327,19 +411,23 @@ async def callback_handler(callback):
             f"Выбери игру:",
             reply_markup=games_menu(),
         )
+
         return
 
-    # =========================
+    # -------------------------
     # КУБИКИ
-    # =========================
+    # -------------------------
+
     if callback.data == "game_dice":
         await start_dice_game(callback)
         return
 
-    # =========================
+    # -------------------------
     # 1 БРОСОК
-    # =========================
+    # -------------------------
+
     if callback.data == "dice_mode_1":
+
         game = games.get(user_id)
 
         if not game:
@@ -358,12 +446,15 @@ async def callback_handler(callback):
             "Выбери прогноз:",
             reply_markup=dice_one_predictions(),
         )
+
         return
 
-    # =========================
+    # -------------------------
     # 2 БРОСКА
-    # =========================
+    # -------------------------
+
     if callback.data == "dice_mode_2":
+
         game = games.get(user_id)
 
         if not game:
@@ -382,11 +473,13 @@ async def callback_handler(callback):
             "Выбери прогноз:",
             reply_markup=dice_two_predictions(),
         )
+
         return
 
-    # =========================
+    # -------------------------
     # ПРОГНОЗ
-    # =========================
+    # -------------------------
+
     if callback.data in (
         "dice_one_less",
         "dice_one_more",
@@ -394,6 +487,7 @@ async def callback_handler(callback):
         "dice_two_equal",
         "dice_two_more",
     ):
+
         game = games.get(user_id)
 
         if not game:
@@ -404,12 +498,14 @@ async def callback_handler(callback):
             return
 
         if game["mode"] == 1:
+
             if callback.data == "dice_one_less":
                 game["prediction"] = "less"
             else:
                 game["prediction"] = "more"
 
         elif game["mode"] == 2:
+
             if callback.data == "dice_two_less":
                 game["prediction"] = "less"
 
@@ -419,30 +515,43 @@ async def callback_handler(callback):
             else:
                 game["prediction"] = "more"
 
+        # Для двух кубиков
+        # очищаем первый результат,
+        # если он вдруг остался.
+        game.pop("first_dice", None)
+
         await callback.answer()
 
         if game["mode"] == 1:
+
             await callback.message.answer(
-                "🎲 Отправь эмодзи 🎲, чтобы бросить кубик."
+                "🎲 Отправь эмодзи 🎲, "
+                "чтобы бросить кубик."
             )
+
         else:
+
             await callback.message.answer(
-                "🎲 Отправь эмодзи 🎲, чтобы бросить кубики."
+                "🎲 Отправь эмодзи 🎲, "
+                "чтобы бросить первый кубик."
             )
 
         return
 
-    # =========================
+    # -------------------------
     # БРОСИТЬ ЕЩЁ РАЗ
-    # =========================
+    # -------------------------
+
     if callback.data == "dice_again":
         await start_dice_game(callback)
         return
 
-    # =========================
+    # -------------------------
     # К ИГРАМ
-    # =========================
+    # -------------------------
+
     if callback.data == "games_menu":
+
         games.pop(user_id, None)
 
         balance = get_balance(user_id)
@@ -455,67 +564,130 @@ async def callback_handler(callback):
             f"Выбери игру:",
             reply_markup=games_menu(),
         )
+
         return
 
     await callback.answer()
 
 
+# =========================
+# STARTUP
+# =========================
+
 @app.on_event("startup")
 async def startup():
+
     init_db()
 
-    webhook_url = f"{RENDER_URL}/webhook/{WEBHOOK_SECRET}"
+    webhook_url = (
+        f"{RENDER_URL}/webhook/{WEBHOOK_SECRET}"
+    )
 
-    print("SETTING WEBHOOK:", webhook_url)
+    print(
+        "SETTING WEBHOOK:",
+        webhook_url,
+    )
 
     await bot.set_webhook(
         webhook_url,
         secret_token=WEBHOOK_SECRET,
         drop_pending_updates=False,
-        allowed_updates=["message", "callback_query"],
+        allowed_updates=[
+            "message",
+            "callback_query",
+        ],
     )
 
     info = await bot.get_webhook_info()
 
-    print("WEBHOOK URL:", info.url)
-    print("PENDING UPDATES:", info.pending_update_count)
-    print("LAST ERROR:", info.last_error_message)
+    print(
+        "WEBHOOK URL:",
+        info.url,
+    )
 
+    print(
+        "PENDING UPDATES:",
+        info.pending_update_count,
+    )
+
+    print(
+        "LAST ERROR:",
+        info.last_error_message,
+    )
+
+
+# =========================
+# SHUTDOWN
+# =========================
 
 @app.on_event("shutdown")
 async def shutdown():
-    # НЕ удаляем webhook при перезапуске Render.
+
+    # НЕ удаляем webhook.
+    # Иначе старый экземпляр Render
+    # может удалить webhook после запуска нового.
+
     await bot.session.close()
 
 
+# =========================
+# HEALTH CHECK
+# =========================
+
 @app.get("/")
 async def home():
-    return {"status": "ok"}
+    return {
+        "status": "ok"
+    }
 
+
+# =========================
+# TELEGRAM WEBHOOK
+# =========================
 
 @app.post("/webhook/{secret}")
 async def webhook(
     secret: str,
     request: Request,
-    x_telegram_bot_api_secret_token: str | None = Header(default=None),
+    x_telegram_bot_api_secret_token: str | None = Header(
+        default=None
+    ),
 ):
+
     print("=== WEBHOOK ===")
 
     if secret != WEBHOOK_SECRET:
-        raise HTTPException(status_code=403)
+        raise HTTPException(
+            status_code=403
+        )
 
-    if x_telegram_bot_api_secret_token != WEBHOOK_SECRET:
-        raise HTTPException(status_code=403)
+    if (
+        x_telegram_bot_api_secret_token
+        != WEBHOOK_SECRET
+    ):
+        raise HTTPException(
+            status_code=403
+        )
 
     data = await request.json()
 
-    print("UPDATE RECEIVED:", data)
+    print(
+        "UPDATE RECEIVED:",
+        data,
+    )
 
     update = Update.model_validate(
         data,
-        context={"bot": bot},
+        context={
+            "bot": bot
+        },
     )
 
-    await dp.feed_update(bot, update)
+    await dp.feed_update(
+        bot,
+        update,
+    )
 
-    return {"ok": True}
+    return {
+        "ok": True
+    }
