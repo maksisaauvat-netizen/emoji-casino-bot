@@ -164,6 +164,8 @@ async def webhook(
     request: Request,
     x_telegram_bot_api_secret_token: str | None = Header(default=None),
 ):
+    print("=== WEBHOOK CODE v2 ===")
+
     if secret != WEBHOOK_SECRET:
         raise HTTPException(status_code=403)
 
@@ -172,12 +174,12 @@ async def webhook(
 
     data = await request.json()
 
-print("UPDATE RECEIVED:", data)
+    print("UPDATE RECEIVED:", data)
 
-update = Update.model_validate(
-    data,
-    context={"bot": bot}
-)
+    update = Update.model_validate(
+        data,
+        context={"bot": bot}
+    )
 
     await dp.feed_update(bot, update)
 
