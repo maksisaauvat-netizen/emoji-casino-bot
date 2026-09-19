@@ -466,7 +466,6 @@ async def startup():
 
 @app.on_event("shutdown")
 async def shutdown():
-    await bot.delete_webhook()
     await bot.session.close()
 
 
