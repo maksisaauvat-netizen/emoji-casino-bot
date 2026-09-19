@@ -127,8 +127,14 @@ MINES_MULTIPLIERS = {
 # CRASH
 # =========================================================
 
-CRASH_MIN = 1.10
+CRASH_MIN = 1.00
 CRASH_MAX = 20.00
+
+# Настройка вероятности Crash.
+# Чем меньше значение, тем чаще будут ранние Crash.
+# Было: 2.5
+# Сейчас: 2.1
+CRASH_MEAN = 2.1
 
 
 # =========================================================
@@ -1785,7 +1791,7 @@ async def mines_cashout_callback(
 def generate_crash_point():
 
     value = random.expovariate(
-        1.0 / 2.5
+        1.0 / CRASH_MEAN
     )
 
     crash_point = 1.00 + value
