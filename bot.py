@@ -231,22 +231,55 @@ async def games_handler(callback: CallbackQuery):
 @dp.callback_query(F.data == "game_dice")
 async def game_dice_handler(callback: CallbackQuery):
     user_id = callback.from_user.id
-
     balance = get_balance(user_id)
 
     await callback.message.edit_text(
         "🎲 <b>Кубики</b>\n\n"
-        f"💰 Баланс: <b>{balance}</b>\n\n"
-        f"Ставка: <b>{STAKE}</b>\n\n"
-        "Нажмите «Бросить кубики».",
+        f"💰 Баланс: <b>{balance}</b>\n"
+        f"💵 Ставка: <b>{STAKE}</b>\n\n"
+        "<b>Один бросок</b>\n"
+        "x1.85 | Меньше 3\n"
+        "x1.85 | Больше 3\n\n"
+        "<b>Два броска</b>\n"
+        "x5.00 | Равно 7\n"
+        "x1.85 | Меньше 7\n"
+        "x1.85 | Больше 7\n\n"
+        "Выберите режим:",
         reply_markup=dice_menu()
     )
 
     await callback.answer()
 
 
-@dp.callback_query(F.data == "dice_start")
-async def dice_start_handler(callback: CallbackQuery):
+def dice_menu():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🎲 1 бросок",
+                    callback_data="dice_one"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🎲🎲 2 броска",
+                    callback_data="dice_two"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🎮 Игры",
+                    callback_data="games"
+                )
+            ],
+        ]
+    )
+
+
+@dp.callback_query(
+    F.data.in_({"dice_one", "dice_two"})
+)
+async def dice_mode_handler(callback: CallbackQuery):
     user_id = callback.from_user.id
 
     if not subtract_balance(user_id, STAKE):
@@ -256,17 +289,203 @@ async def dice_start_handler(callback: CallbackQuery):
         )
         return
 
-    games[user_id] = {
-        "type": "dice",
-        "first_dice": None,
-    }
+    if callback.data == "dice_one":
 
-    await callback.message.answer(
-        "🎲 <b>Бросьте первый кубик!</b>"
-    )
+        games[user_id] = {
+            "type": "dice_one"
+        }
+
+        await callback.message.answer(
+            "🎲 <b>Один бросок</b>\n\n"
+            "Отправьте 🎲\n\n"
+            "x1.85 — меньше 3\n"
+            "x1.85 — больше 3"
+        )
+
+    else:
+
+        games[user_id] = {
+            "type": "dice_two",
+            "first_dice": None
+        }
+
+        await callback.message.answer(
+            "🎲🎲 <b>Два броска</b>\n\n"
+            "Отправьте первый 🎲"
+        )
 
     await callback.answer()
 
+
+# =========================
+# ОБРАБОТКА КУБИКОВ
+# =========================
+
+@dp.message(F.dice)
+async def dice_handler(message: Message):
+
+    user_id = message.from_user.id
+
+    if user_id not in games:
+        return
+
+    game = games[user_id]
+
+    emoji = message.dice.emoji
+    value = message.dice.value
+
+    if emoji != "🎲":
+        return
+
+    # =========================
+    # ОДИН БРОСОК
+    # =========================
+
+    if game["type"] == "dice_one":
+
+        del games[user_id]
+
+        if value < 3:
+            multiplier = 1.85
+            payout = int(STAKE * multiplier)
+
+            new_balance = change_balance(
+                user_id,
+                payout
+            )
+
+            result_text = (
+                "🎉 <b>Выигрыш!</b>\n"
+                "📊 Результат: <b>меньше 3</b>\n"
+                "📈 Коэффициент: <b>x1.85</b>\n"
+                f"💰 Выплата: <b>+{payout}</b>"
+            )
+
+        elif value > 3:
+            multiplier = 1.85
+            payout = int(STAKE * multiplier)
+
+            new_balance = change_balance(
+                user_id,
+                payout
+            )
+
+            result_text = (
+                "🎉 <b>Выигрыш!</b>\n"
+                "📊 Результат: <b>больше 3</b>\n"
+                "📈 Коэффициент: <b>x1.85</b>\n"
+                f"💰 Выплата: <b>+{payout}</b>"
+            )
+
+        else:
+            new_balance = get_balance(user_id)
+
+            result_text = (
+                "😔 <b>Проигрыш</b>\n"
+                "📊 Выпало: <b>3</b>\n"
+                "Для выигрыша нужно было меньше 3 или больше 3."
+            )
+
+        await message.answer(
+            "🎲 <b>Результат</b>\n\n"
+            f"🎯 Выпало: <b>{value}</b>\n\n"
+            f"{result_text}\n\n"
+            f"💳 Баланс: <b>{new_balance}</b>",
+            reply_markup=after_game_menu()
+        )
+
+        return
+
+    # =========================
+    # ДВА БРОСКА
+    # =========================
+
+    if game["type"] == "dice_two":
+
+        first_dice = game["first_dice"]
+
+        if first_dice is None:
+
+            game["first_dice"] = value
+
+            await message.answer(
+                "🎲 <b>Первый кубик:</b> "
+                f"<b>{value}</b>\n\n"
+                "🎲 Теперь отправьте второй кубик."
+            )
+
+            return
+
+        second_dice = value
+        total = first_dice + second_dice
+
+        del games[user_id]
+
+        # РОВНО 7
+        if total == 7:
+
+            multiplier = 5.00
+            payout = int(STAKE * multiplier)
+
+            new_balance = change_balance(
+                user_id,
+                payout
+            )
+
+            result_text = (
+                "🎉 <b>ДЖЕКПОТ!</b>\n"
+                "🎯 Сумма ровно 7\n"
+                "📈 Коэффициент: <b>x5.00</b>\n"
+                f"💰 Выплата: <b>+{payout}</b>"
+            )
+
+        # МЕНЬШЕ 7
+        elif total < 7:
+
+            multiplier = 1.85
+            payout = int(STAKE * multiplier)
+
+            new_balance = change_balance(
+                user_id,
+                payout
+            )
+
+            result_text = (
+                "🎉 <b>Выигрыш!</b>\n"
+                "📊 Сумма меньше 7\n"
+                "📈 Коэффициент: <b>x1.85</b>\n"
+                f"💰 Выплата: <b>+{payout}</b>"
+            )
+
+        # БОЛЬШЕ 7
+        else:
+
+            multiplier = 1.85
+            payout = int(STAKE * multiplier)
+
+            new_balance = change_balance(
+                user_id,
+                payout
+            )
+
+            result_text = (
+                "🎉 <b>Выигрыш!</b>\n"
+                "📊 Сумма больше 7\n"
+                "📈 Коэффициент: <b>x1.85</b>\n"
+                f"💰 Выплата: <b>+{payout}</b>"
+            )
+
+        await message.answer(
+            "🎲🎲 <b>Результат двух бросков</b>\n\n"
+            f"Первый кубик: <b>{first_dice}</b>\n"
+            f"Второй кубик: <b>{second_dice}</b>\n"
+            f"Сумма: <b>{total}</b>\n\n"
+            f"{result_text}\n\n"
+            f"💳 Баланс: <b>{new_balance}</b>",
+            reply_markup=after_game_menu()
+        )
+
+        return
 
 # =========================
 # РУЛЕТКА
