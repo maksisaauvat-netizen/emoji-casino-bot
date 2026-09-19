@@ -61,6 +61,59 @@ async def message_handler(message):
 @dp.callback_query()
 async def callback_handler(callback):
     user_id = callback.from_user.id
+    balance = get_balance(user_id)
+
+    if callback.data == "play":
+        await callback.answer()
+
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="🪙 10",
+                        callback_data="bet_10"
+                    ),
+                    InlineKeyboardButton(
+                        text="🪙 50",
+                        callback_data="bet_50"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton(
+                        text="🪙 100",
+                        callback_data="bet_100"
+                    ),
+                    InlineKeyboardButton(
+                        text="🪙 500",
+                        callback_data="bet_500"
+                    ),
+                ],
+            ]
+        )
+
+        await callback.message.answer(
+            f"🎰 Выбери ставку:\n\n"
+            f"💰 Баланс: {balance} монет",
+            reply_markup=keyboard
+        )
+
+    elif callback.data.startswith("bet_"):
+        bet = int(callback.data.split("_")[1])
+
+        if balance < bet:
+            await callback.answer(
+                "❌ Недостаточно монет!",
+                show_alert=True
+            )
+            return
+
+        await callback.answer()
+
+        await callback.message.answer(
+            f"🎲 Ставка: {bet} монет\n\n"
+            f"🎰 Бросаем..."
+        )
+    user_id = callback.from_user.id
 
     if callback.data == "play":
         balance = get_balance(user_id)
