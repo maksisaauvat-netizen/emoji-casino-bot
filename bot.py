@@ -129,10 +129,20 @@ async def callback_handler(callback):
 @app.on_event("startup")
 async def startup():
     webhook_url = f"{RENDER_URL}/webhook/{WEBHOOK_SECRET}"
+
+    print("SETTING WEBHOOK:", webhook_url)
+
     await bot.set_webhook(
         webhook_url,
-        secret_token=WEBHOOK_SECRET
+        secret_token=WEBHOOK_SECRET,
+        drop_pending_updates=False,
     )
+
+    info = await bot.get_webhook_info()
+
+    print("WEBHOOK URL:", info.url)
+    print("PENDING UPDATES:", info.pending_update_count)
+    print("LAST ERROR:", info.last_error_message)
 
 
 @app.on_event("shutdown")
