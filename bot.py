@@ -35,8 +35,7 @@ bot = Bot(TOKEN)
 dp = Dispatcher()
 app = FastAPI()
 
-# Активные игры пользователей.
-# Деньги при этом хранятся в SQLite.
+# Активные игры пользователей
 games = {}
 
 
@@ -138,7 +137,6 @@ def after_game_keyboard():
 async def start_dice_game(callback):
     user_id = callback.from_user.id
 
-    # Нельзя создать второй раунд поверх существующего.
     if user_id in games:
         await callback.answer(
             "🎲 У тебя уже есть активная игра.",
@@ -155,7 +153,6 @@ async def start_dice_game(callback):
         )
         return
 
-    # Списываем 100 только один раз.
     success = subtract_balance(user_id, 100)
 
     if not success:
@@ -211,8 +208,9 @@ async def message_handler(message):
         )
         return
 
-    # Принимаем только сообщение с одним эмодзи 🎲.
-    if message.text and message.text.strip() == "🎲":
+    # Распознаём сообщение с эмодзи кубика.
+    # Используем поиск по тексту, а не строгое сравнение.
+    if message.text and "🎲" in message.text:
         game = games.get(user_id)
 
         if not game:
@@ -224,12 +222,13 @@ async def message_handler(message):
         if game["mode"] is None or game["prediction"] is None:
             return
 
-        # Сразу закрываем раунд.
+        # Сразу закрываем раунд,
+        # чтобы повторное сообщение не дало вторую выплату.
         game["completed"] = True
 
-        # -------------------------
+        # =========================
         # 1 КУБИК
-        # -------------------------
+        # =========================
         if game["mode"] == 1:
             result = random.randint(1, 6)
 
@@ -252,17 +251,17 @@ async def message_handler(message):
 
             await message.answer(
                 f"🎲 Результат: {result}\n\n"
-                f"Ставка: 100 💎 "
-                f"Коэффициент: x{coefficient:.2f} "
+                f"Ставка: 100 💎\n"
+                f"Коэффициент: x{coefficient:.2f}\n"
                 f"Выплата: {payout} 💎\n\n"
                 f"💎 Баланс: {balance} 💎",
                 reply_markup=after_game_keyboard(),
             )
             return
 
-        # -------------------------
+        # =========================
         # 2 КУБИКА
-        # -------------------------
+        # =========================
         if game["mode"] == 2:
             first = random.randint(1, 6)
             second = random.randint(1, 6)
@@ -273,15 +272,20 @@ async def message_handler(message):
             if prediction == "less":
                 win = total < 7
                 coefficient = 1.85
+
             elif prediction == "equal":
                 win = total == 7
                 coefficient = 5.00
+
             else:
                 win = total > 7
                 coefficient = 1.85
 
             if win:
-                payout = 500 if coefficient == 5.00 else 185
+                if coefficient == 5.00:
+                    payout = 500
+                else:
+                    payout = 185
             else:
                 payout = 0
 
@@ -294,8 +298,8 @@ async def message_handler(message):
 
             await message.answer(
                 f"🎲 Результат: {first} + {second} = {total}\n\n"
-                f"Ставка: 100 💎 "
-                f"Коэффициент: x{coefficient:.2f} "
+                f"Ставка: 100 💎\n"
+                f"Коэффициент: x{coefficient:.2f}\n"
                 f"Выплата: {payout} 💎\n\n"
                 f"💎 Баланс: {balance} 💎",
                 reply_markup=after_game_keyboard(),
@@ -309,9 +313,9 @@ async def callback_handler(callback):
 
     user_id = callback.from_user.id
 
-    # -------------------------
-    # КНОПКА ИГРАТЬ
-    # -------------------------
+    # =========================
+    # ИГРАТЬ
+    # =========================
     if callback.data == "play":
         balance = get_balance(user_id)
 
@@ -325,16 +329,16 @@ async def callback_handler(callback):
         )
         return
 
-    # -------------------------
+    # =========================
     # КУБИКИ
-    # -------------------------
+    # =========================
     if callback.data == "game_dice":
         await start_dice_game(callback)
         return
 
-    # -------------------------
+    # =========================
     # 1 БРОСОК
-    # -------------------------
+    # =========================
     if callback.data == "dice_mode_1":
         game = games.get(user_id)
 
@@ -356,9 +360,9 @@ async def callback_handler(callback):
         )
         return
 
-    # -------------------------
+    # =========================
     # 2 БРОСКА
-    # -------------------------
+    # =========================
     if callback.data == "dice_mode_2":
         game = games.get(user_id)
 
@@ -380,9 +384,9 @@ async def callback_handler(callback):
         )
         return
 
-    # -------------------------
+    # =========================
     # ПРОГНОЗ
-    # -------------------------
+    # =========================
     if callback.data in (
         "dice_one_less",
         "dice_one_more",
@@ -408,8 +412,10 @@ async def callback_handler(callback):
         elif game["mode"] == 2:
             if callback.data == "dice_two_less":
                 game["prediction"] = "less"
+
             elif callback.data == "dice_two_equal":
                 game["prediction"] = "equal"
+
             else:
                 game["prediction"] = "more"
 
@@ -426,16 +432,16 @@ async def callback_handler(callback):
 
         return
 
-    # -------------------------
+    # =========================
     # БРОСИТЬ ЕЩЁ РАЗ
-    # -------------------------
+    # =========================
     if callback.data == "dice_again":
         await start_dice_game(callback)
         return
 
-    # -------------------------
+    # =========================
     # К ИГРАМ
-    # -------------------------
+    # =========================
     if callback.data == "games_menu":
         games.pop(user_id, None)
 
@@ -476,12 +482,9 @@ async def startup():
     print("LAST ERROR:", info.last_error_message)
 
 
-# ВАЖНО:
-# Здесь НЕ удаляем webhook.
-# Иначе старый экземпляр Render может удалить webhook
-# после запуска нового экземпляра.
 @app.on_event("shutdown")
 async def shutdown():
+    # НЕ удаляем webhook при перезапуске Render.
     await bot.session.close()
 
 
