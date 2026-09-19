@@ -330,8 +330,42 @@ def record_game(
 
 def get_game_history(
     user_id: int,
-    limit: int = 10
+    limit: int = 10,
+    offset: int = 0
 ):
+
+    ensure_user(user_id)
+
+    connection = get_connection()
+
+    rows = connection.execute(
+        """
+        SELECT
+            game,
+            stake,
+            result,
+            multiplier,
+            payout,
+            created_at
+        FROM game_history
+        WHERE user_id = ?
+        ORDER BY id DESC
+        LIMIT ?
+        OFFSET ?
+        """,
+        (
+            user_id,
+            limit,
+            offset
+        )
+    ).fetchall()
+
+    connection.close()
+
+    return [
+        dict(row)
+        for row in rows
+    ]
 
     ensure_user(user_id)
 
