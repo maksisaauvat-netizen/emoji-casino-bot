@@ -134,10 +134,11 @@ async def startup():
     print("SETTING WEBHOOK:", webhook_url)
 
     await bot.set_webhook(
-        webhook_url,
-        secret_token=WEBHOOK_SECRET,
-        drop_pending_updates=False,
-    )
+    webhook_url,
+    secret_token=WEBHOOK_SECRET,
+    drop_pending_updates=False,
+    allowed_updates=["message", "callback_query"],
+)
 
     info = await bot.get_webhook_info()
 
