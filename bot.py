@@ -60,6 +60,7 @@ async def message_handler(message):
 
 @dp.callback_query()
 async def callback_handler(callback):
+        print("CALLBACK RECEIVED:", callback.data)
     user_id = callback.from_user.id
     balance = get_balance(user_id)
 
