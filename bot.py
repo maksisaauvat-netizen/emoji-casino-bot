@@ -135,6 +135,11 @@ def main_keyboard(user_id: int):
         callback_data="deposit"
     )
 
+    builder.button(
+        text="💸 ВЫВЕСТИ",
+        callback_data="withdraw"
+    )
+
     builder.adjust(2)
 
     if is_admin(user_id):
@@ -2337,7 +2342,242 @@ async def crash_giveup(callback: CallbackQuery):
         "Ставка проиграна.\n\n"
         f"💳 Баланс: <b>{money(get_balance(user_id))} ₽</b>",
         after_game_keyboard()
-    )# =========================================================
+    )
+    
+# =========================================================
+# WITHDRAWAL
+# =========================================================
+
+MIN_WITHDRAWAL = 500
+
+
+def withdrawal_keyboard():
+    builder = InlineKeyboardBuilder()
+
+    builder.button(
+        text="❌ ОТМЕНА",
+        callback_data="back_main"
+    )
+
+    builder.adjust(1)
+
+    return builder.as_markup()
+
+
+@dp.callback_query(F.data == "withdraw")
+async def withdraw_start(callback: CallbackQuery):
+    user_id = callback.from_user.id
+
+    balance = get_balance(user_id)
+
+    await callback.answer()
+
+    if balance < MIN_WITHDRAWAL:
+        await edit_or_answer(
+            callback,
+            "💸 <b>ВЫВОД</b>\n\n"
+            f"💰 Доступно: <b>{money(balance)} ₽</b>\n\n"
+            f"Минимальная сумма вывода: "
+            f"<b>{money(MIN_WITHDRAWAL)} ₽</b>.",
+            wallet_keyboard()
+        )
+        return
+
+    games[user_id] = {
+        "withdraw_action": "amount"
+    }
+
+    await edit_or_answer(
+        callback,
+        "💸 <b>ВЫВОД СРЕДСТВ</b>\n\n"
+        f"💰 Доступно: <b>{money(balance)} ₽</b>\n"
+        f"📉 Минимум: <b>{money(MIN_WITHDRAWAL)} ₽</b>\n\n"
+        "Введите сумму вывода в рублях.\n\n"
+        "Например:\n"
+        "<code>5000</code>",
+        withdrawal_keyboard()
+    )
+
+
+@dp.callback_query(F.data == "my_withdrawals")
+async def my_withdrawals_handler(
+    callback: CallbackQuery
+):
+    user_id = callback.from_user.id
+
+    await callback.answer()
+
+    history = get_user_withdrawals(
+        user_id,
+        10
+    )
+
+    if not history:
+        text = (
+            "💸 <b>ВЫВОДЫ</b>\n\n"
+            "Заявок пока нет."
+        )
+
+    else:
+        lines = [
+            "💸 <b>МОИ ВЫВОДЫ</b>\n"
+        ]
+
+        status_names = {
+            "pending": "⏳ Ожидает",
+            "approved": "✅ Подтверждён",
+            "rejected": "❌ Отклонён",
+        }
+
+        for item in history:
+            status = status_names.get(
+                item["status"],
+                item["status"]
+            )
+
+            lines.append(
+                f"#{item['id']} — "
+                f"<b>{money(item['amount_rub'])} ₽</b>\n"
+                f"{status}"
+            )
+
+        text = "\n\n".join(lines)
+
+    builder = InlineKeyboardBuilder()
+
+    builder.button(
+        text="⬅️ НАЗАД",
+        callback_data="profile"
+    )
+
+    await edit_or_answer(
+        callback,
+        text,
+        builder.as_markup()
+    )
+
+
+@dp.message()
+async def withdrawal_message_handler(
+    message: Message
+):
+    user_id = message.from_user.id
+
+    state = games.get(user_id)
+
+    if not state:
+        return
+
+    if state.get("withdraw_action") == "amount":
+
+        text = (
+            message.text or ""
+        ).strip()
+
+        try:
+            amount = int(text)
+
+            if amount < MIN_WITHDRAWAL:
+                raise ValueError
+
+        except Exception:
+            await message.answer(
+                "❌ Некорректная сумма.\n\n"
+                f"Минимальный вывод: "
+                f"<b>{money(MIN_WITHDRAWAL)} ₽</b>"
+            )
+            return
+
+        balance = get_balance(user_id)
+
+        if amount > balance:
+            await message.answer(
+                "❌ Недостаточно средств.\n\n"
+                f"💰 Ваш баланс: "
+                f"<b>{money(balance)} ₽</b>"
+            )
+            return
+
+        games[user_id] = {
+            "withdraw_action": "destination",
+            "withdraw_amount": amount
+        }
+
+        await message.answer(
+            "💳 <b>РЕКВИЗИТЫ ДЛЯ ВЫВОДА</b>\n\n"
+            f"💰 Сумма: <b>{money(amount)} ₽</b>\n\n"
+            "Отправьте реквизиты, на которые "
+            "нужно выполнить выплату.\n\n"
+            "Например, адрес кошелька USDT TRC20."
+        )
+
+        return
+
+    if state.get("withdraw_action") == "destination":
+
+        destination = (
+            message.text or ""
+        ).strip()
+
+        if len(destination) < 5:
+            await message.answer(
+                "❌ Реквизиты слишком короткие.\n"
+                "Проверьте и отправьте ещё раз."
+            )
+            return
+
+        amount = state.get(
+            "withdraw_amount"
+        )
+
+        if not amount:
+            games.pop(
+                user_id,
+                None
+            )
+
+            await message.answer(
+                "❌ Заявка устарела.\n"
+                "Создайте вывод заново."
+            )
+            return
+
+        withdrawal = create_withdrawal(
+            user_id=user_id,
+            amount_rub=amount,
+            method="manual",
+            destination=destination
+        )
+
+        if withdrawal is None:
+            games.pop(
+                user_id,
+                None
+            )
+
+            await message.answer(
+                "❌ Не удалось создать заявку.\n\n"
+                "Возможно, недостаточно средств."
+            )
+            return
+
+        games.pop(
+            user_id,
+            None
+        )
+
+        await message.answer(
+            "✅ <b>ЗАЯВКА НА ВЫВОД СОЗДАНА</b>\n\n"
+            f"🧾 Номер: <b>#{withdrawal['id']}</b>\n"
+            f"💰 Сумма: <b>{money(amount)} ₽</b>\n"
+            "⏳ Статус: <b>ОЖИДАЕТ ПРОВЕРКИ</b>\n\n"
+            "Средства зарезервированы до решения "
+            "администратора.\n\n"
+            "После проверки вы получите уведомление."
+        )
+
+        return
+# =========================================================
 # ADMIN PANEL
 # =========================================================
 
