@@ -672,10 +672,7 @@ async def back_main(callback: CallbackQuery):
         "      🎰 <b>RESONANT</b>\n"
         "        <b>CASINO</b>\n"
         "╚══════════════════════╝\n\n"
-        "💎 <b>VIP GAMING CLUB</b>\n\n"
-        "💰 <b>ДОСТУПНЫЙ БАЛАНС</b>\n"
-        f"<b>{money(get_balance(user_id))} ₽</b>\n\n"
-        "Выберите действие 👇"
+    
     )
 
     await edit_or_answer(
