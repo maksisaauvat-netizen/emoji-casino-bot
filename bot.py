@@ -1742,7 +1742,7 @@ async def crash_loop(user_id: int):
                 "crash",
                 stake,
                 "loss",
-                crash_point,
+                float(crash_point),
                 0
             )
 
@@ -1798,7 +1798,7 @@ async def crash_cashout(callback: CallbackQuery):
         "crash",
         game["stake"],
         "win",
-        multiplier,
+        float(multiplier),
         payout
     )
 
@@ -1902,7 +1902,14 @@ async def history(callback: CallbackQuery):
 
         for row in rows:
 
+            result_text = (
+                "✅"
+                if row["result"] == "win"
+                else "❌"
+            )
+
             text += (
+                f"{result_text} "
                 f"🎮 {row['game']} | "
                 f"ставка {money(row['stake'])} ₽ | "
                 f"выигрыш {money(row['payout'])} ₽\n"
@@ -2091,6 +2098,24 @@ async def startup():
             WEBHOOK_URL
         )
 
+        # Проверяем, какой webhook реально установлен
+        info = await bot.get_webhook_info()
+
+        print(
+            "TELEGRAM WEBHOOK URL:",
+            info.url
+        )
+
+        print(
+            "TELEGRAM PENDING UPDATES:",
+            info.pending_update_count
+        )
+
+        if info.url != WEBHOOK_URL:
+            print(
+                "WARNING: TELEGRAM WEBHOOK URL DOES NOT MATCH!"
+            )
+
     except Exception as error:
 
         print(
@@ -2106,14 +2131,21 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
 
-    # НЕ удаляем webhook.
+    # ВАЖНО:
+    # webhook НЕ удаляем.
     #
     # Render может перезапускать контейнер.
-    # Telegram должен продолжать знать адрес webhook.
+    # Telegram должен сохранять webhook.
     #
     # await bot.delete_webhook()  <-- НЕ ИСПОЛЬЗУЕМ
 
-    await bot.session.close()
+    try:
+        await bot.session.close()
+    except Exception as error:
+        print(
+            "BOT SESSION CLOSE ERROR:",
+            repr(error)
+        )
 
 
 # =========================================================
