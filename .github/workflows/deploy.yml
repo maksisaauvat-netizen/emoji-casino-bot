@@ -1,0 +1,50 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Update BOT_TOKEN in Render
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          curl --fail --silent --show-error \
+            --request PUT \
+            --url "https://api.render.com/v1/services/srv-dan7p43m8hqs73abutb0/env-vars/BOT_TOKEN" \
+            --header "Authorization: Bearer ${RENDER_API_KEY}" \
+            --header "Accept: application/json" \
+            --header "Content-Type: application/json" \
+            --data "{\"value\":\"${BOT_TOKEN}\"}"
+
+      - name: Update CRYPTO_PAY_TOKEN in Render
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          CRYPTO_PAY_TOKEN: ${{ secrets.CRYPTO_PAY_TOKEN }}
+        run: |
+          curl --fail --silent --show-error \
+            --request PUT \
+            --url "https://api.render.com/v1/services/srv-dan7p43m8hqs73abutb0/env-vars/CRYPTO_PAY_TOKEN" \
+            --header "Authorization: Bearer ${RENDER_API_KEY}" \
+            --header "Accept: application/json" \
+            --header "Content-Type: application/json" \
+            --data "{\"value\":\"${CRYPTO_PAY_TOKEN}\"}"
+
+      - name: Deploy Render service
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          curl --fail --silent --show-error \
+            --request POST \
+            --url "https://api.render.com/v1/services/srv-dan7p43m8hqs73abutb0/deploys" \
+            --header "Authorization: Bearer ${RENDER_API_KEY}" \
+            --header "Accept: application/json" \
+            --header "Content-Type: application/json" \
+            --data '{"clearCache":"do_not_clear"}'
