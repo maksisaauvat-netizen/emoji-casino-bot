@@ -9,7 +9,12 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart
-from aiogram.types import Message, CallbackQuery, Update
+from aiogram.types import (
+    Message,
+    CallbackQuery,
+    Update,
+    InputMediaPhoto,
+)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from admin import is_admin
@@ -40,7 +45,6 @@ from payments import (
     get_invoice,
 )
 
-
 # =========================================================
 # CONFIG
 # =========================================================
@@ -59,7 +63,6 @@ WEBHOOK_URL = f"{BASE_URL}{WEBHOOK_PATH}"
 
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN is not set")
-
 
 bot = Bot(
     token=BOT_TOKEN,
@@ -90,6 +93,26 @@ CRASH_MAX = 20.0
 # Минимальный вывод = 1 USDT
 MIN_WITHDRAWAL = 80
 
+# =========================================================
+# PREMIUM PHOTOS
+# =========================================================
+#
+# Фотографии подключаются через Render Environment Variables.
+#
+# Если переменная пустая — бот автоматически использует
+# обычный текстовый интерфейс.
+#
+# Позже сюда можно добавить Telegram file_id фотографий.
+#
+
+PHOTO_MAIN = os.getenv("PHOTO_MAIN", "")
+PHOTO_GAMES = os.getenv("PHOTO_GAMES", "")
+PHOTO_WALLET = os.getenv("PHOTO_WALLET", "")
+PHOTO_ROULETTE = os.getenv("PHOTO_ROULETTE", "")
+PHOTO_MINES = os.getenv("PHOTO_MINES", "")
+PHOTO_CRASH = os.getenv("PHOTO_CRASH", "")
+PHOTO_WITHDRAW = os.getenv("PHOTO_WITHDRAW", "")
+PHOTO_ADMIN = os.getenv("PHOTO_ADMIN", "")
 
 # =========================================================
 # PREMIUM UI / HELPERS
@@ -106,18 +129,119 @@ def safe_user_id(message: Message) -> int:
 async def edit_or_answer(
     callback: CallbackQuery,
     text: str,
-    keyboard=None
+    keyboard=None,
+    photo: str = ""
 ):
+    """
+    Универсальное переключение:
+    text -> text
+    text -> photo
+    photo -> text
+    photo -> photo
+    """
+
+    message = callback.message
+
+    # -----------------------------------------------------
+    # PHOTO MODE
+    # -----------------------------------------------------
+
+    if photo:
+        try:
+            if message.photo:
+                await message.edit_media(
+                    media=InputMediaPhoto(
+                        media=photo,
+                        caption=text,
+                        parse_mode=ParseMode.HTML
+                    ),
+                    reply_markup=keyboard
+                )
+            else:
+                try:
+                    await message.delete()
+                except Exception:
+                    pass
+
+                await message.answer_photo(
+                    photo=photo,
+                    caption=text,
+                    reply_markup=keyboard,
+                    parse_mode=ParseMode.HTML
+                )
+
+            return
+
+        except Exception as error:
+            print(
+                "PHOTO EDIT ERROR:",
+                repr(error)
+            )
+
+    # -----------------------------------------------------
+    # TEXT MODE
+    # -----------------------------------------------------
+
     try:
-        await callback.message.edit_text(
-            text,
-            reply_markup=keyboard
+        if message.photo:
+            try:
+                await message.delete()
+            except Exception:
+                pass
+
+            await message.answer(
+                text,
+                reply_markup=keyboard
+            )
+        else:
+            await message.edit_text(
+                text,
+                reply_markup=keyboard
+            )
+
+    except Exception as error:
+        print(
+            "EDIT TEXT ERROR:",
+            repr(error)
         )
-    except Exception:
-        await callback.message.answer(
-            text,
-            reply_markup=keyboard
-        )
+
+        try:
+            await message.answer(
+                text,
+                reply_markup=keyboard
+            )
+        except Exception as answer_error:
+            print(
+                "ANSWER ERROR:",
+                repr(answer_error)
+            )
+
+
+async def answer_start_screen(
+    message: Message,
+    text: str,
+    keyboard,
+    photo: str = ""
+):
+    if photo:
+        try:
+            await message.answer_photo(
+                photo=photo,
+                caption=text,
+                reply_markup=keyboard,
+                parse_mode=ParseMode.HTML
+            )
+            return
+        except Exception as error:
+            print(
+                "START PHOTO ERROR:",
+                repr(error)
+            )
+
+    await message.answer(
+        text,
+        reply_markup=keyboard
+    )
 
 
 def main_keyboard(user_id: int):
@@ -356,7 +480,7 @@ async def start_handler(message: Message):
 
     ensure_user(user_id)
 
-    await message.answer(
+    text = (
         "╔══════════════════════╗\n"
         "      🎰 <b>RESONANT</b>\n"
         "        <b>CASINO</b>\n"
@@ -367,8 +491,37 @@ async def start_handler(message: Message):
         "◆ ИГРЫ\n"
         "◆ СТАВКИ\n"
         "◆ ВЫИГРЫШИ\n\n"
-        "Выберите действие 👇",
-        reply_markup=main_keyboard(user_id)
+        "Выберите действие 👇"
+    )
+
+    await answer_start_screen(
+        message,
+        text,
+        main_keyboard(user_id),
+        PHOTO_MAIN
+    )
+
+
+# =========================================================
+# ADMIN PHOTO ID HELPER
+# =========================================================
+
+@dp.message(F.photo)
+async def admin_photo_id_handler(
+    message: Message
+):
+    user_id = message.from_user.id
+
+    if not is_admin(user_id):
+        return
+
+    file_id = message.photo[-1].file_id
+
+    await message.answer(
+        "🖼 <b>PHOTO FILE ID</b>\n\n"
+        f"<code>{file_id}</code>\n\n"
+        "Скопируйте этот ID и добавьте его "
+        "в соответствующую переменную Render."
     )
 
 
@@ -382,8 +535,7 @@ async def back_main(callback: CallbackQuery):
 
     await callback.answer()
 
-    await edit_or_answer(
-        callback,
+    text = (
         "╔══════════════════════╗\n"
         "      🎰 <b>RESONANT</b>\n"
         "        <b>CASINO</b>\n"
@@ -391,8 +543,14 @@ async def back_main(callback: CallbackQuery):
         "💎 <b>VIP GAMING CLUB</b>\n\n"
         "💰 <b>ДОСТУПНЫЙ БАЛАНС</b>\n"
         f"<b>{money(get_balance(user_id))} ₽</b>\n\n"
-        "Выберите действие 👇",
-        main_keyboard(user_id)
+        "Выберите действие 👇"
+    )
+
+    await edit_or_answer(
+        callback,
+        text,
+        main_keyboard(user_id),
+        PHOTO_MAIN
     )
 
 
@@ -412,7 +570,8 @@ async def games_handler(callback: CallbackQuery):
         "💎 <b>ВЫБЕРИТЕ ИГРУ</b>\n\n"
         "🎲 Азарт • 🎰 Удача • 🚀 Риск\n\n"
         "Ставка списывается только после подтверждения.",
-        games_keyboard()
+        games_keyboard(),
+        PHOTO_GAMES
     )
 
 
@@ -438,7 +597,8 @@ async def wallet_handler(callback: CallbackQuery):
         "◆ Пополняйте баланс\n"
         "◆ Играйте в мини-игры\n"
         "◆ Вывод от 80 ₽",
-        wallet_keyboard()
+        wallet_keyboard(),
+        PHOTO_WALLET
     )
 
 
@@ -631,7 +791,8 @@ async def deposit_handler(callback: CallbackQuery):
         "╰────────────────────╯\n\n"
         "Выберите сумму пополнения в USDT.\n\n"
         "💎 Курс бота: <b>1 USDT = 80 ₽</b>",
-        builder.as_markup()
+        builder.as_markup(),
+        PHOTO_WALLET
     )
 
 
@@ -1658,7 +1819,8 @@ async def roulette_start(
         "       🎡 <b>ROULETTE</b>\n"
         "╰────────────────────╯\n\n"
         "Выберите ставку:",
-        stake_keyboard("roulette")
+        stake_keyboard("roulette"),
+        PHOTO_ROULETTE
     )
 
 
@@ -1915,7 +2077,8 @@ async def mines_start(
         "На поле 9 клеток.\n"
         "2 из них — мины.\n\n"
         "Выберите ставку:",
-        stake_keyboard("mines")
+        stake_keyboard("mines"),
+        PHOTO_MINES
     )
 
 
@@ -2180,7 +2343,8 @@ async def crash_start(
         "Нажмите «💰 ЗАБРАТЬ», "
         "пока самолёт не разбился.\n\n"
         "Выберите ставку:",
-        stake_keyboard("crash")
+        stake_keyboard("crash"),
+        PHOTO_CRASH
     )
 
 
@@ -2603,7 +2767,8 @@ async def withdraw_start(
             "Минимальная сумма вывода: "
             f"<b>{money(MIN_WITHDRAWAL)} ₽</b>\n"
             "(1 USDT)",
-            wallet_keyboard()
+            wallet_keyboard(),
+            PHOTO_WITHDRAW
         )
         return
 
@@ -2624,7 +2789,8 @@ async def withdraw_start(
         "Введите сумму вывода в рублях.\n\n"
         "Например:\n"
         "<code>5000</code>",
-        withdrawal_keyboard()
+        withdrawal_keyboard(),
+        PHOTO_WITHDRAW
     )
 
 
@@ -2740,7 +2906,8 @@ async def admin_panel(
         "╚══════════════════════╝\n\n"
         "Системное управление.\n\n"
         "Выберите действие:",
-        admin_main_keyboard()
+        admin_main_keyboard(),
+        PHOTO_ADMIN
     )
 
 
@@ -3159,7 +3326,8 @@ async def admin_withdrawals(
             "       💸 <b>WITHDRAWALS</b>\n"
             "╰────────────────────╯\n\n"
             "Ожидающих заявок нет.",
-            admin_main_keyboard()
+            admin_main_keyboard(),
+            PHOTO_ADMIN
         )
         return
 
@@ -3171,7 +3339,8 @@ async def admin_withdrawals(
         "Выберите заявку:",
         admin_withdrawal_list_keyboard(
             withdrawals
-        )
+        ),
+        PHOTO_ADMIN
     )
 
 
