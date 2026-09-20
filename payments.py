@@ -1,73 +1,78 @@
 import os
 import aiohttp
 
-from database import (
-    process_payment,
-    get_balance,
-)
+from database import process_payment
 
 
 CRYPTO_PAY_TOKEN = os.getenv("CRYPTO_PAY_TOKEN")
 
 USDT_TO_RUB = 80
-
 MIN_DEPOSIT_USDT = 1
 
 CRYPTO_PAY_API = "https://pay.crypt.bot/api"
 
 
-# =========================================================
-# CRYPTO PAY API
-# =========================================================
-
 async def crypto_request(
     method: str,
-    endpoint: str,
     data: dict | None = None
 ):
     if not CRYPTO_PAY_TOKEN:
-        raise RuntimeError(
-            "CRYPTO_PAY_TOKEN is not configured"
-        )
+        raise RuntimeError("CRYPTO_PAY_TOKEN is not set")
 
     headers = {
         "Crypto-Pay-API-Token": CRYPTO_PAY_TOKEN,
         "Content-Type": "application/json",
     }
 
-    url = f"{CRYPTO_PAY_API}/{endpoint}"
+    url = f"{CRYPTO_PAY_API}/{method}"
 
-    async with aiohttp.ClientSession() as session:
+    timeout = aiohttp.ClientTimeout(total=20)
 
-        async with session.request(
-            method,
+    async with aiohttp.ClientSession(
+        timeout=timeout
+    ) as session:
+
+        async with session.post(
             url,
             headers=headers,
             json=data or {}
         ) as response:
 
-            result = await response.json()
+            text = await response.text()
+
+            print(
+                "CRYPTO PAY RESPONSE:",
+                method,
+                response.status,
+                text
+            )
+
+            if response.status != 200:
+                raise RuntimeError(
+                    f"Crypto Pay HTTP {response.status}: {text}"
+                )
+
+            try:
+                result = await response.json()
+            except Exception:
+                raise RuntimeError(
+                    f"Crypto Pay returned invalid JSON: {text}"
+                )
 
             if not result.get("ok"):
-
                 raise RuntimeError(
-                    result.get(
-                        "error",
-                        "Crypto Pay API error"
-                    )
+                    f"Crypto Pay API error: {result}"
                 )
 
             return result.get("result")
 
 
 # =========================================================
-# CRYPTO PAY APP
+# GET APP
 # =========================================================
 
 async def get_crypto_app():
-
     return await crypto_request(
-        "GET",
         "getMe"
     )
 
@@ -80,65 +85,38 @@ async def create_invoice(
     user_id: int,
     amount_usdt: float
 ):
-
     if amount_usdt < MIN_DEPOSIT_USDT:
-
         raise ValueError(
-            f"Минимальное пополнение: "
-            f"{MIN_DEPOSIT_USDT} USDT"
+            f"Minimum deposit is {MIN_DEPOSIT_USDT} USDT"
         )
 
-    amount_rub = int(
-        amount_usdt * USDT_TO_RUB
-    )
-
-    invoice = await crypto_request(
-        "POST",
+    result = await crypto_request(
         "createInvoice",
         {
             "currency_type": "crypto",
-
             "asset": "USDT",
-
             "amount": str(amount_usdt),
-
-            "description": (
-                f"Пополнение Resonant Casino: "
-                f"{amount_rub} ₽"
-            ),
-
-            # Передаём Telegram user_id
-            # внутрь invoice.
-            # Потом он используется
-            # для определения владельца платежа.
             "payload": str(user_id),
-
-            "allow_comments": False,
-
-            "allow_anonymous": False,
-
-            "expires_in": 3600,
+            "description": "Resonant Casino deposit",
         }
     )
 
+    print(
+        "CREATED INVOICE:",
+        result
+    )
+
     return {
-        "invoice_id": invoice["invoice_id"],
-
-        "amount_usdt": amount_usdt,
-
-        "amount_rub": amount_rub,
-
-        "pay_url": invoice.get(
-            "pay_url"
+        "invoice_id": int(result["invoice_id"]),
+        "pay_url": (
+            result.get("pay_url")
+            or result.get("bot_invoice_url")
+            or result.get("mini_app_invoice_url")
         ),
-
-        "bot_invoice_url": invoice.get(
-            "bot_invoice_url"
-        ),
-
-        "status": invoice.get(
-            "status"
-        ),
+        "status": result.get("status"),
+        "amount": result.get("amount"),
+        "asset": result.get("asset"),
+        "payload": result.get("payload"),
     }
 
 
@@ -149,42 +127,50 @@ async def create_invoice(
 async def get_invoice(
     invoice_id: int
 ):
-
-    invoices = await crypto_request(
-        "GET",
+    result = await crypto_request(
         "getInvoices",
         {
             "invoice_ids": str(invoice_id)
         }
     )
 
-    if not invoices:
+    print(
+        "GET INVOICE RESULT:",
+        invoice_id,
+        result
+    )
 
+    if not result:
         return None
 
-    return invoices[0]
+    invoice = result[0]
+
+    return invoice
 
 
 # =========================================================
-# CHECK PAYMENT STATUS
+# CHECK PAYMENT
 # =========================================================
 
 async def check_invoice_paid(
     invoice_id: int
 ):
-
     invoice = await get_invoice(
         invoice_id
     )
 
-    if invoice is None:
-
+    if not invoice:
         return False
 
-    return (
-        invoice.get("status")
-        == "paid"
+    status = invoice.get("status")
+
+    print(
+        "INVOICE STATUS:",
+        invoice_id,
+        status
     )
+
+    return status == "paid"
 
 
 # =========================================================
@@ -194,141 +180,89 @@ async def check_invoice_paid(
 async def process_paid_invoice(
     invoice_id: int
 ):
-    """
-    Проверяет invoice в Crypto Pay.
-
-    Если invoice действительно оплачен,
-    деньги зачисляются пользователю.
-
-    ВАЖНО:
-
-    Повторная обработка одного invoice
-    НЕ зачисляет деньги повторно.
-
-    Защита находится в database.process_payment().
-    """
-
-    # -----------------------------------------------------
-    # Получаем invoice из Crypto Pay
-    # -----------------------------------------------------
-
     invoice = await get_invoice(
         invoice_id
     )
 
-    if invoice is None:
-
+    if not invoice:
+        print(
+            "PROCESS PAYMENT: invoice not found",
+            invoice_id
+        )
         return None
 
-    # -----------------------------------------------------
-    # Проверяем статус
-    # -----------------------------------------------------
+    status = invoice.get("status")
 
-    if invoice.get("status") != "paid":
-
-        return None
-
-    # -----------------------------------------------------
-    # Получаем payload
-    # -----------------------------------------------------
-
-    payload = invoice.get(
-        "payload"
+    print(
+        "PROCESS PAYMENT STATUS:",
+        invoice_id,
+        status
     )
 
-    if not payload:
-
+    if status != "paid":
         return None
 
-    # -----------------------------------------------------
-    # В payload должен находиться user_id
-    # -----------------------------------------------------
+    payload = invoice.get("payload")
 
-    try:
-
-        user_id = int(
-            payload
+    if payload is None:
+        raise RuntimeError(
+            "Paid invoice has no payload"
         )
 
-    except (
-        TypeError,
-        ValueError
-    ):
-
-        return None
-
-    # -----------------------------------------------------
-    # Получаем сумму
-    # -----------------------------------------------------
+    try:
+        user_id = int(payload)
+    except Exception:
+        raise RuntimeError(
+            f"Invalid invoice payload: {payload}"
+        )
 
     try:
-
         amount_usdt = float(
-            invoice.get(
-                "amount",
-                0
-            )
+            invoice.get("amount", 0)
+        )
+    except Exception:
+        raise RuntimeError(
+            f"Invalid invoice amount: {invoice.get('amount')}"
         )
 
-    except (
-        TypeError,
-        ValueError
-    ):
-
-        return None
-
-    # -----------------------------------------------------
-    # Проверяем сумму
-    # -----------------------------------------------------
-
-    if amount_usdt <= 0:
-
-        return None
-
-    # -----------------------------------------------------
-    # Переводим USDT → RUB
-    # -----------------------------------------------------
-
-    amount_rub = int(
-        amount_usdt * USDT_TO_RUB
+    amount_rub = usdt_to_rub(
+        amount_usdt
     )
 
-    if amount_rub <= 0:
-
-        return None
-
-    # -----------------------------------------------------
-    # БЕЗОПАСНОЕ ЗАЧИСЛЕНИЕ
-    # -----------------------------------------------------
-
-    # process_payment():
-    #
-    # 1. Проверяет invoice_id.
-    # 2. Если invoice уже был обработан —
-    #    возвращает None.
-    # 3. Если новый —
-    #    записывает платёж.
-    # 4. Начисляет баланс.
-    # 5. Делает всё одной транзакцией SQLite.
-    #
-    # Поэтому один invoice невозможно
-    # нормально зачислить дважды.
+    print(
+        "PROCESSING PAID INVOICE:",
+        {
+            "invoice_id": invoice_id,
+            "user_id": user_id,
+            "amount_usdt": amount_usdt,
+            "amount_rub": amount_rub,
+        }
+    )
 
     result = process_payment(
         invoice_id=invoice_id,
-
         user_id=user_id,
-
         amount_usdt=amount_usdt,
-
         amount_rub=amount_rub
+    )
+
+    if result is None:
+        print(
+            "PAYMENT ALREADY PROCESSED:",
+            invoice_id
+        )
+        return None
+
+    print(
+        "PAYMENT PROCESSED SUCCESSFULLY:",
+        result
     )
 
     return result
 
 
 # =========================================================
-# CURRENCY CONVERSION
+# CURRENCY
 # =========================================================
 
 def usdt_to_rub(
@@ -336,7 +270,9 @@ def usdt_to_rub(
 ) -> int:
 
     return int(
-        amount_usdt * USDT_TO_RUB
+        round(
+            amount_usdt * USDT_TO_RUB
+        )
     )
 
 
@@ -354,19 +290,38 @@ def rub_to_usdt(
 # PAYMENT INFO
 # =========================================================
 
-def get_payment_info(
-    user_id: int
+async def get_payment_info(
+    invoice_id: int
 ):
-
-    balance = get_balance(
-        user_id
+    invoice = await get_invoice(
+        invoice_id
     )
 
+    if not invoice:
+        return None
+
+    try:
+        amount_usdt = float(
+            invoice.get("amount", 0)
+        )
+    except Exception:
+        amount_usdt = 0
+
     return {
-        "balance": balance,
-
-        "rate": USDT_TO_RUB,
-
-        "min_deposit_usdt":
-            MIN_DEPOSIT_USDT,
+        "invoice_id": int(
+            invoice.get("invoice_id")
+        ),
+        "user_id": (
+            int(invoice["payload"])
+            if invoice.get("payload")
+            else None
+        ),
+        "amount_usdt": amount_usdt,
+        "amount_rub": usdt_to_rub(
+            amount_usdt
+        ),
+        "status": invoice.get("status"),
+        "asset": invoice.get("asset"),
+        "created_at": invoice.get("created_at"),
+        "paid_at": invoice.get("paid_at"),
     }
