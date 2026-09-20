@@ -248,27 +248,27 @@ def main_keyboard(user_id: int):
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="🎰  ИГРЫ",
+        text="🎰 | ИГРЫ",
         callback_data="games"
     )
 
     builder.button(
-        text="💰  БАЛАНС",
+        text="💰 | БАЛАНС",
         callback_data="wallet"
     )
 
     builder.button(
-        text="👤  ПРОФИЛЬ",
+        text="👤 | ПРОФИЛЬ",
         callback_data="profile"
     )
 
     builder.button(
-        text="💳  ПОПОЛНИТЬ",
+        text="💳 | ПОПОЛНИТЬ",
         callback_data="deposit"
     )
 
     builder.button(
-        text="💸  ВЫВЕСТИ",
+        text="💸 | ВЫВЕСТИ",
         callback_data="withdraw"
     )
 
@@ -276,7 +276,7 @@ def main_keyboard(user_id: int):
 
     if is_admin(user_id):
         builder.button(
-            text="🛠  ADMIN PANEL",
+            text="🛠 | ADMIN PANEL",
             callback_data="admin"
         )
 
@@ -286,43 +286,38 @@ def main_keyboard(user_id: int):
 def games_keyboard():
     builder = InlineKeyboardBuilder()
 
-    builder.button(
-        text="🎲  КУБИК",
-        callback_data="game_dice"
-    )
+builder.button(
+    text="🎲 | DICE",
+    callback_data="game_dice"
+)
 
     builder.button(
-        text="🎲🎲  ДВА КУБИКА",
-        callback_data="game_two_dice"
-    )
-
-    builder.button(
-        text="🎰  СЛОТЫ",
+        text="🎰 | SLOTS",
         callback_data="game_slots"
     )
 
     builder.button(
-        text="🎳  БОУЛИНГ",
+        text="🎳 | BOWLING",
         callback_data="game_bowling"
     )
 
     builder.button(
-        text="🎡  РУЛЕТКА",
+        text="🎡 | ROULLETE",
         callback_data="game_roulette"
     )
 
     builder.button(
-        text="💣  MINES",
+        text="💣 | MINES",
         callback_data="game_mines"
     )
 
     builder.button(
-        text="🚀  CRASH",
+        text="🚀 | CRASH",
         callback_data="game_crash"
     )
 
     builder.button(
-        text="⬅️  ГЛАВНОЕ МЕНЮ",
+        text="⬅️ | ГЛАВНОЕ МЕНЮ",
         callback_data="back_main"
     )
 
@@ -335,12 +330,12 @@ def stake_keyboard(prefix: str):
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="💎  ВВЕСТИ СТАВКУ",
+        text="💎 | ВВЕСТИ СТАВКУ",
         callback_data=f"{prefix}_enter_stake"
     )
 
     builder.button(
-        text="⬅️  НАЗАД",
+        text="⬅️ | НАЗАД",
         callback_data="games"
     )
 
@@ -353,7 +348,7 @@ def confirm_bet_keyboard(game: str):
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="💎  ПОДТВЕРДИТЬ СТАВКУ",
+        text="💎 | ПОДТВЕРДИТЬ СТАВКУ",
         callback_data=f"confirm_{game}"
     )
 
