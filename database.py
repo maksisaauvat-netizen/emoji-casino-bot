@@ -1,26 +1,54 @@
 import sqlite3
 from pathlib import Path
 
+
+# =========================================================
+# CONFIG
+# =========================================================
+
 DB_PATH = Path("casino.db")
 
 
+# =========================================================
+# CONNECTION
+# =========================================================
+
 def get_connection():
-    connection = sqlite3.connect(DB_PATH, timeout=15.0)
+    connection = sqlite3.connect(
+        DB_PATH,
+        timeout=15.0
+    )
+
     connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA journal_mode=WAL")
-    connection.execute("PRAGMA busy_timeout=15000")
-    connection.execute("PRAGMA synchronous=NORMAL")
+
+    connection.execute(
+        "PRAGMA journal_mode=WAL"
+    )
+
+    connection.execute(
+        "PRAGMA busy_timeout=15000"
+    )
+
+    connection.execute(
+        "PRAGMA synchronous=NORMAL"
+    )
+
     return connection
 
 
+# =========================================================
+# INIT DATABASE
+# =========================================================
+
 def init_db():
     connection = get_connection()
+
     try:
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
-                balance INTEGER NOT NULL DEFAULT 1000,
+                balance INTEGER NOT NULL DEFAULT 0,
                 games_played INTEGER NOT NULL DEFAULT 0,
                 wins INTEGER NOT NULL DEFAULT 0,
                 losses INTEGER NOT NULL DEFAULT 0,
@@ -76,16 +104,25 @@ def init_db():
         )
 
         connection.commit()
+
     finally:
         connection.close()
 
 
+# =========================================================
+# USERS
+# =========================================================
+
 def ensure_user(user_id: int):
     """
     Создаёт пользователя только если его ещё нет.
-    Стартовые 1000 начисляются только здесь.
+
+    Новый пользователь получает 0 ₽.
+    Существующий баланс не изменяется.
     """
+
     connection = get_connection()
+
     try:
         connection.execute(
             """
@@ -93,17 +130,20 @@ def ensure_user(user_id: int):
                 user_id,
                 balance
             )
-            VALUES (?, 1000)
+            VALUES (?, 0)
             """,
             (user_id,)
         )
+
         connection.commit()
+
     finally:
         connection.close()
 
 
 def user_exists(user_id: int) -> bool:
     connection = get_connection()
+
     try:
         row = connection.execute(
             """
@@ -113,17 +153,25 @@ def user_exists(user_id: int) -> bool:
             """,
             (user_id,)
         ).fetchone()
+
         return row is not None
+
     finally:
         connection.close()
 
 
+# =========================================================
+# BALANCE
+# =========================================================
+
 def get_balance(user_id: int) -> int:
     """
     Только читает баланс.
-    Никаких автоматических стартовых 1000.
+    Ничего автоматически не начисляет.
     """
+
     connection = get_connection()
+
     try:
         row = connection.execute(
             """
@@ -137,13 +185,25 @@ def get_balance(user_id: int) -> int:
         if row is None:
             return 0
 
-        return row["balance"]
+        return int(row["balance"])
+
     finally:
         connection.close()
 
 
-def change_balance(user_id: int, amount: int) -> int:
+def change_balance(
+    user_id: int,
+    amount: int
+) -> int:
+    """
+    Изменяет баланс пользователя на amount.
+
+    amount > 0  -> пополнение
+    amount < 0  -> списание
+    """
+
     connection = get_connection()
+
     try:
         cursor = connection.execute(
             """
@@ -151,12 +211,18 @@ def change_balance(user_id: int, amount: int) -> int:
             SET balance = balance + ?
             WHERE user_id = ?
             """,
-            (amount, user_id)
+            (
+                amount,
+                user_id
+            )
         )
 
         if cursor.rowcount != 1:
             connection.rollback()
-            raise ValueError("User is not registered")
+
+            raise ValueError(
+                "User is not registered"
+            )
 
         row = connection.execute(
             """
@@ -168,13 +234,27 @@ def change_balance(user_id: int, amount: int) -> int:
         ).fetchone()
 
         connection.commit()
-        return row["balance"]
+
+        return int(row["balance"])
+
     finally:
         connection.close()
 
 
-def subtract_balance(user_id: int, amount: int) -> bool:
+def subtract_balance(
+    user_id: int,
+    amount: int
+) -> bool:
+    """
+    Безопасно списывает сумму только если
+    на балансе достаточно средств.
+    """
+
+    if amount <= 0:
+        return False
+
     connection = get_connection()
+
     try:
         cursor = connection.execute(
             """
@@ -183,18 +263,30 @@ def subtract_balance(user_id: int, amount: int) -> bool:
             WHERE user_id = ?
               AND balance >= ?
             """,
-            (amount, user_id, amount)
+            (
+                amount,
+                user_id,
+                amount
+            )
         )
 
         success = cursor.rowcount == 1
+
         connection.commit()
+
         return success
+
     finally:
         connection.close()
 
 
+# =========================================================
+# USER STATS
+# =========================================================
+
 def get_user_stats(user_id: int):
     connection = get_connection()
+
     try:
         row = connection.execute(
             """
@@ -226,9 +318,14 @@ def get_user_stats(user_id: int):
             }
 
         return dict(row)
+
     finally:
         connection.close()
 
+
+# =========================================================
+# GAMES
+# =========================================================
 
 def record_game(
     user_id: int,
@@ -239,6 +336,7 @@ def record_game(
     payout: int = 0
 ):
     connection = get_connection()
+
     try:
         user = connection.execute(
             """
@@ -250,11 +348,27 @@ def record_game(
         ).fetchone()
 
         if user is None:
-            raise ValueError("User is not registered")
+            raise ValueError(
+                "User is not registered"
+            )
 
-        wins = 1 if result == "win" else 0
-        losses = 1 if result == "loss" else 0
-        win_amount = payout if result == "win" else 0
+        wins = (
+            1
+            if result == "win"
+            else 0
+        )
+
+        losses = (
+            1
+            if result == "loss"
+            else 0
+        )
+
+        win_amount = (
+            payout
+            if result == "win"
+            else 0
+        )
 
         connection.execute(
             """
@@ -304,12 +418,17 @@ def record_game(
         )
 
         connection.commit()
+
     finally:
         connection.close()
 
 
-def get_game_history(user_id: int, limit: int = 10):
+def get_game_history(
+    user_id: int,
+    limit: int = 10
+):
     connection = get_connection()
+
     try:
         rows = connection.execute(
             """
@@ -325,16 +444,30 @@ def get_game_history(user_id: int, limit: int = 10):
             ORDER BY id DESC
             LIMIT ?
             """,
-            (user_id, limit)
+            (
+                user_id,
+                limit
+            )
         ).fetchall()
 
-        return [dict(row) for row in rows]
+        return [
+            dict(row)
+            for row in rows
+        ]
+
     finally:
         connection.close()
 
 
-def payment_exists(invoice_id: int) -> bool:
+# =========================================================
+# PAYMENTS
+# =========================================================
+
+def payment_exists(
+    invoice_id: int
+) -> bool:
     connection = get_connection()
+
     try:
         row = connection.execute(
             """
@@ -346,6 +479,7 @@ def payment_exists(invoice_id: int) -> bool:
         ).fetchone()
 
         return row is not None
+
     finally:
         connection.close()
 
@@ -357,6 +491,7 @@ def add_payment(
     amount_rub: int
 ) -> bool:
     connection = get_connection()
+
     try:
         cursor = connection.execute(
             """
@@ -378,7 +513,9 @@ def add_payment(
         )
 
         connection.commit()
+
         return cursor.rowcount == 1
+
     finally:
         connection.close()
 
@@ -389,10 +526,20 @@ def process_payment(
     amount_usdt: float,
     amount_rub: int
 ):
+    """
+    Атомарно:
+    1. Проверяет пользователя.
+    2. Проверяет, не обработан ли invoice.
+    3. Записывает платёж.
+    4. Начисляет деньги.
+    """
+
     connection = get_connection()
 
     try:
-        connection.execute("BEGIN IMMEDIATE")
+        connection.execute(
+            "BEGIN IMMEDIATE"
+        )
 
         user = connection.execute(
             """
@@ -405,7 +552,10 @@ def process_payment(
 
         if user is None:
             connection.rollback()
-            raise ValueError("User is not registered")
+
+            raise ValueError(
+                "User is not registered"
+            )
 
         existing = connection.execute(
             """
@@ -445,7 +595,10 @@ def process_payment(
             SET balance = balance + ?
             WHERE user_id = ?
             """,
-            (amount_rub, user_id)
+            (
+                amount_rub,
+                user_id
+            )
         )
 
         row = connection.execute(
@@ -457,7 +610,9 @@ def process_payment(
             (user_id,)
         ).fetchone()
 
-        new_balance = row["balance"]
+        new_balance = int(
+            row["balance"]
+        )
 
         connection.commit()
 
@@ -477,8 +632,11 @@ def process_payment(
         connection.close()
 
 
-def get_payment(invoice_id: int):
+def get_payment(
+    invoice_id: int
+):
     connection = get_connection()
+
     try:
         row = connection.execute(
             """
@@ -499,12 +657,17 @@ def get_payment(invoice_id: int):
             return None
 
         return dict(row)
+
     finally:
         connection.close()
 
 
-def get_payment_history(user_id: int, limit: int = 20):
+def get_payment_history(
+    user_id: int,
+    limit: int = 20
+):
     connection = get_connection()
+
     try:
         rows = connection.execute(
             """
@@ -519,17 +682,24 @@ def get_payment_history(user_id: int, limit: int = 20):
             ORDER BY id DESC
             LIMIT ?
             """,
-            (user_id, limit)
+            (
+                user_id,
+                limit
+            )
         ).fetchall()
 
-        return [dict(row) for row in rows]
+        return [
+            dict(row)
+            for row in rows
+        ]
+
     finally:
         connection.close()
 
 
-# ============================================================
+# =========================================================
 # WITHDRAWALS
-# ============================================================
+# =========================================================
 
 def create_withdrawal(
     user_id: int,
@@ -537,20 +707,31 @@ def create_withdrawal(
     payout_details: str
 ):
     """
-    Создаёт заявку на вывод и сразу резервирует деньги,
-    уменьшая баланс игрока.
+    Создаёт заявку на вывод.
+
+    Деньги сразу резервируются:
+    баланс пользователя уменьшается,
+    а сумма записывается в withdrawals.
+
+    При отклонении заявки деньги возвращаются.
     """
 
     if amount_rub <= 0:
-        raise ValueError("Withdrawal amount must be positive")
+        raise ValueError(
+            "Withdrawal amount must be positive"
+        )
 
     if not payout_details.strip():
-        raise ValueError("Payout details are required")
+        raise ValueError(
+            "Payout details are required"
+        )
 
     connection = get_connection()
 
     try:
-        connection.execute("BEGIN IMMEDIATE")
+        connection.execute(
+            "BEGIN IMMEDIATE"
+        )
 
         user = connection.execute(
             """
@@ -563,7 +744,10 @@ def create_withdrawal(
 
         if user is None:
             connection.rollback()
-            raise ValueError("User is not registered")
+
+            raise ValueError(
+                "User is not registered"
+            )
 
         if user["balance"] < amount_rub:
             connection.rollback()
@@ -635,8 +819,11 @@ def create_withdrawal(
         connection.close()
 
 
-def get_withdrawal(withdrawal_id: int):
+def get_withdrawal(
+    withdrawal_id: int
+):
     connection = get_connection()
+
     try:
         row = connection.execute(
             """
@@ -664,8 +851,15 @@ def get_withdrawal(withdrawal_id: int):
         connection.close()
 
 
-def get_pending_withdrawals(limit: int = 20):
+def get_pending_withdrawals(
+    limit: int = 20
+):
+    """
+    Возвращает только заявки со статусом pending.
+    """
+
     connection = get_connection()
+
     try:
         rows = connection.execute(
             """
@@ -686,22 +880,31 @@ def get_pending_withdrawals(limit: int = 20):
             (limit,)
         ).fetchall()
 
-        return [dict(row) for row in rows]
+        return [
+            dict(row)
+            for row in rows
+        ]
 
     finally:
         connection.close()
 
 
-def approve_withdrawal(withdrawal_id: int):
+def approve_withdrawal(
+    withdrawal_id: int
+):
     """
-    Только перевод pending -> approved.
-    Деньги уже были зарезервированы при создании заявки.
+    pending -> approved
+
+    Деньги уже зарезервированы.
+    При подтверждении баланс не меняется.
     """
 
     connection = get_connection()
 
     try:
-        connection.execute("BEGIN IMMEDIATE")
+        connection.execute(
+            "BEGIN IMMEDIATE"
+        )
 
         cursor = connection.execute(
             """
@@ -748,15 +951,26 @@ def approve_withdrawal(withdrawal_id: int):
         connection.close()
 
 
-def complete_withdrawal(withdrawal_id: int):
+def complete_withdrawal(
+    withdrawal_id: int
+):
     """
-    Используется после того, как админ реально отправил выплату.
+    approved -> paid
+
+    Используется после того,
+    как администратор реально отправил выплату.
+
+    Баланс пользователя НЕ меняется,
+    потому что деньги были списаны
+    при создании заявки.
     """
 
     connection = get_connection()
 
     try:
-        connection.execute("BEGIN IMMEDIATE")
+        connection.execute(
+            "BEGIN IMMEDIATE"
+        )
 
         cursor = connection.execute(
             """
@@ -803,16 +1017,22 @@ def complete_withdrawal(withdrawal_id: int):
         connection.close()
 
 
-def reject_withdrawal(withdrawal_id: int):
+def reject_withdrawal(
+    withdrawal_id: int
+):
     """
-    Отклоняет только pending-заявку.
-    При отказе деньги возвращаются игроку.
+    pending -> rejected
+
+    Зарезервированные деньги
+    возвращаются пользователю.
     """
 
     connection = get_connection()
 
     try:
-        connection.execute("BEGIN IMMEDIATE")
+        connection.execute(
+            "BEGIN IMMEDIATE"
+        )
 
         row = connection.execute(
             """
@@ -892,7 +1112,14 @@ def reject_withdrawal(withdrawal_id: int):
         connection.close()
 
 
-def get_withdrawal_history(user_id: int, limit: int = 20):
+def get_withdrawal_history(
+    user_id: int,
+    limit: int = 20
+):
+    """
+    История выводов конкретного пользователя.
+    """
+
     connection = get_connection()
 
     try:
@@ -917,7 +1144,10 @@ def get_withdrawal_history(user_id: int, limit: int = 20):
             )
         ).fetchall()
 
-        return [dict(row) for row in rows]
+        return [
+            dict(row)
+            for row in rows
+        ]
 
     finally:
         connection.close()
