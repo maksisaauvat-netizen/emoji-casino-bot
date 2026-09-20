@@ -623,13 +623,7 @@ async def start_handler(message: Message):
         "      🎰 <b>RESONANT</b>\n"
         "        <b>CASINO</b>\n"
         "╚══════════════════════╝\n\n"
-        "💎 <b>VIP GAMING CLUB</b>\n\n"
-        "💰 <b>ДОСТУПНЫЙ БАЛАНС</b>\n"
-        f"<b>{money(get_balance(user_id))} ₽</b>\n\n"
-        "◆ ИГРЫ\n"
-        "◆ СТАВКИ\n"
-        "◆ ВЫИГРЫШИ\n\n"
-        "Выберите действие 👇"
+
     )
 
     await answer_start_screen(
