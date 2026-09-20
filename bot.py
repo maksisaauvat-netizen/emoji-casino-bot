@@ -15,6 +15,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from admin import is_admin
 from database import (
     init_db,
+    ensure_user,
     get_balance,
     change_balance,
     subtract_balance,
@@ -22,6 +23,12 @@ from database import (
     get_game_history,
     get_payment_history,
     record_game,
+    create_withdrawal,
+    get_withdrawal,
+    get_withdrawals,
+    approve_withdrawal,
+    reject_withdrawal,
+    get_user_withdrawals,
 )
 from payments import (
     create_invoice,
@@ -329,7 +336,7 @@ def slot_symbols_from_value(value: int):
 async def start_handler(message: Message):
     user_id = safe_user_id(message)
 
-    get_balance(user_id)
+    ensure_user(user_id)
 
     await message.answer(
         "🎰 <b>RESONANT — CASINO</b>\n\n"
