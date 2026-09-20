@@ -1246,78 +1246,86 @@ async def handle_stake_message(
         return True
     return True
     
-# =========================================================
-# DICE
-# =========================================================
-
 @dp.callback_query(F.data == "game_dice")
-async def dice_start(callback: CallbackQuery):
+async def dice_start(
+    callback: CallbackQuery
+):
     await callback.answer()
-
     await edit_or_answer(
         callback,
         "╭────────────────────╮\n"
-        "       🎲 <b>DICE</b>\n"
+        "       🎲 <b>| DICE</b>\n"
         "╰────────────────────╯\n\n"
         "Выберите ставку:",
         stake_keyboard("dice")
     )
-
-
-@dp.callback_query(F.data.startswith("dice_stake_"))
-async def dice_stake(callback: CallbackQuery):
+@dp.callback_query(
+    F.data.startswith("dice_stake_")
+)
+async def dice_stake(
+    callback: CallbackQuery
+):
     user_id = callback.from_user.id
-
     stake = int(
         callback.data.split("_")[-1]
     )
-
     games[user_id] = {
         "type": "dice",
         "stake": stake
     }
-
     builder = InlineKeyboardBuilder()
-
+    # БРОСОК 1 РАЗ
     builder.button(
-        text="⬆️  БОЛЬШЕ 3",
-        callback_data="dice_more"
+        text="x1.85 | МЕНЬШЕ 4",
+        callback_data="dice_single_less"
     )
-
     builder.button(
-        text="⬇️  МЕНЬШЕ 4",
-        callback_data="dice_less"
+        text="x1.85 | БОЛЬШЕ 3",
+        callback_data="dice_single_more"
     )
-
+    # БРОСОК 2 РАЗА
     builder.button(
-        text="🎯  РОВНО 2",
-        callback_data="dice_two"
+        text="x2.05 | МЕНЬШЕ 7",
+        callback_data="dice_double_less"
     )
-
+    builder.button(
+        text="x2.05 | БОЛЬШЕ 7",
+        callback_data="dice_double_more"
+    )
+    builder.button(
+        text="x5 | РОВНО 7",
+        callback_data="dice_double_seven"
+    )
     builder.button(
         text="⬅️  НАЗАД",
         callback_data="game_dice"
     )
-
     builder.adjust(1)
-
     await callback.answer()
-
     await edit_or_answer(
         callback,
-        f"🎲 <b>DICE</b>\n\n"
+        "╭────────────────────╮\n"
+        "       🎲 <b>| DICE</b>\n"
+        "╰────────────────────╯\n\n"
         f"💎 Ставка: <b>{money(stake)} ₽</b>\n\n"
+        "<b>БРОСОК 1 РАЗ</b>\n"
+        "x1.85 | Меньше 4\n"
+        "x1.85 | Больше 3\n\n"
+        "<b>БРОСОК 2 РАЗА</b>\n"
+        "x2.05 | Меньше 7\n"
+        "x2.05 | Больше 7\n"
+        "x5 | Ровно 7\n\n"
         "Выберите прогноз:",
         builder.as_markup()
     )
-
-
 @dp.callback_query(
     F.data.in_(
         {
-            "dice_more",
-            "dice_less",
-            "dice_two"
+            "dice_single_less",
+            "dice_single_more",
+            "dice_double_less",
+            "dice_double_more",
+            "dice_double_seven"
         }
     )
 )
@@ -1325,277 +1333,56 @@ async def dice_prediction(
     callback: CallbackQuery
 ):
     user_id = callback.from_user.id
-
-    if user_id not in games:
+    game = games.get(user_id)
+    if not game:
         await callback.answer(
             "Игра устарела",
             show_alert=True
         )
         return
-
-    prediction = {
-        "dice_more": "more",
-        "dice_less": "less",
-        "dice_two": "two"
-    }[callback.data]
-
-    games[user_id]["prediction"] = prediction
-
-    stake = games[user_id]["stake"]
-
+    prediction = callback.data
+    game["prediction"] = prediction
+    stake = game["stake"]
+    prediction_names = {
+        "dice_single_less":
+            "x1.85 | МЕНЬШЕ 4",
+        "dice_single_more":
+            "x1.85 | БОЛЬШЕ 3",
+        "dice_double_less":
+            "x2.05 | МЕНЬШЕ 7",
+        "dice_double_more":
+            "x2.05 | БОЛЬШЕ 7",
+        "dice_double_seven":
+            "x5 | РОВНО 7",
+    }
     await callback.answer()
-
     await edit_or_answer(
         callback,
         "╭────────────────────╮\n"
-        "       🎲 <b>DICE</b>\n"
+        "       🎲 <b>| DICE</b>\n"
         "╰────────────────────╯\n\n"
         f"💎 Ставка: <b>{money(stake)} ₽</b>\n"
-        f"🎯 Прогноз: <b>{prediction}</b>\n\n"
+        f"🎯 Прогноз: "
+        f"<b>{prediction_names[prediction]}</b>\n\n"
         "Подтвердить ставку?",
         confirm_bet_keyboard("dice")
     )
-
-
-@dp.callback_query(F.data == "confirm_dice")
+@dp.callback_query(
+    F.data == "confirm_dice"
+)
 async def confirm_dice(
     callback: CallbackQuery
 ):
     user_id = callback.from_user.id
-
     game = games.get(user_id)
-
     if not game:
         await callback.answer(
             "Игра устарела",
             show_alert=True
         )
         return
-
     stake = game["stake"]
-
-    if not subtract_balance(
-        user_id,
-        stake
-    ):
-        await callback.answer(
-            "Недостаточно средств",
-            show_alert=True
-        )
-        return
-
-    await callback.answer()
-
-    dice = await callback.message.answer_dice(
-        emoji="🎲"
-    )
-
-    await asyncio.sleep(3)
-
-    value = dice.dice.value
     prediction = game["prediction"]
-
-    won = False
-
-    if prediction == "more":
-        won = value > 3
-
-    elif prediction == "less":
-        won = value < 4
-
-    elif prediction == "two":
-        won = value == 2
-
-    if won:
-        multiplier = 2
-        payout = stake * multiplier
-
-        change_balance(
-            user_id,
-            payout
-        )
-
-        record_game(
-            user_id,
-            "dice",
-            stake,
-            "win",
-            multiplier,
-            payout
-        )
-
-        text = (
-            "╭────────────────────╮\n"
-            "       🏆 <b>WIN</b>\n"
-            "╰────────────────────╯\n\n"
-            f"🎲 Выпало: <b>{value}</b>\n\n"
-            "✅ <b>ПОБЕДА</b>\n"
-            f"💰 Выигрыш: "
-            f"<b>+{money(payout)} ₽</b>\n"
-            f"💳 Баланс: "
-            f"<b>{money(get_balance(user_id))} ₽</b>"
-        )
-
-    else:
-        record_game(
-            user_id,
-            "dice",
-            stake,
-            "loss",
-            0,
-            0
-        )
-
-        text = (
-            "╭────────────────────╮\n"
-            "       💥 <b>LOSS</b>\n"
-            "╰────────────────────╯\n\n"
-            f"🎲 Выпало: <b>{value}</b>\n\n"
-            "❌ <b>ПРОИГРЫШ</b>\n"
-            f"💳 Баланс: "
-            f"<b>{money(get_balance(user_id))} ₽</b>"
-        )
-
-    games.pop(user_id, None)
-
-    await callback.message.answer(
-        text,
-        reply_markup=after_game_keyboard()
-    )
-
-
-# =========================================================
-# TWO DICE
-# =========================================================
-
-@dp.callback_query(F.data == "game_two_dice")
-async def two_dice_start(
-    callback: CallbackQuery
-):
-    await callback.answer()
-
-    await edit_or_answer(
-        callback,
-        "╭────────────────────╮\n"
-        "      🎲🎲 <b>TWO DICE</b>\n"
-        "╰────────────────────╯\n\n"
-        "Выберите ставку:",
-        stake_keyboard("two_dice")
-    )
-
-
-@dp.callback_query(
-    F.data.startswith("two_dice_stake_")
-)
-async def two_dice_stake(
-    callback: CallbackQuery
-):
-    user_id = callback.from_user.id
-
-    stake = int(
-        callback.data.split("_")[-1]
-    )
-
-    games[user_id] = {
-        "type": "two_dice",
-        "stake": stake
-    }
-
-    builder = InlineKeyboardBuilder()
-
-    builder.button(
-        text="⬆️  СУММА 8–12",
-        callback_data="two_dice_high"
-    )
-
-    builder.button(
-        text="⬇️  СУММА 2–6",
-        callback_data="two_dice_low"
-    )
-
-    builder.button(
-        text="🎯  РОВНО 7",
-        callback_data="two_dice_seven"
-    )
-
-    builder.button(
-        text="⬅️  НАЗАД",
-        callback_data="game_two_dice"
-    )
-
-    builder.adjust(1)
-
-    await callback.answer()
-
-    await edit_or_answer(
-        callback,
-        f"🎲🎲 <b>TWO DICE</b>\n\n"
-        f"💎 Ставка: <b>{money(stake)} ₽</b>\n\n"
-        "Выберите прогноз:",
-        builder.as_markup()
-    )
-
-
-@dp.callback_query(
-    F.data.in_(
-        {
-            "two_dice_high",
-            "two_dice_low",
-            "two_dice_seven"
-        }
-    )
-)
-async def two_dice_prediction(
-    callback: CallbackQuery
-):
-    user_id = callback.from_user.id
-
-    game = games.get(user_id)
-
-    if not game:
-        await callback.answer(
-            "Игра устарела",
-            show_alert=True
-        )
-        return
-
-    prediction = callback.data.replace(
-        "two_dice_",
-        ""
-    )
-
-    game["prediction"] = prediction
-
-    await callback.answer()
-
-    await edit_or_answer(
-        callback,
-        f"🎲🎲 <b>TWO DICE</b>\n\n"
-        f"💎 Ставка: "
-        f"<b>{money(game['stake'])} ₽</b>\n"
-        f"🎯 Прогноз: <b>{prediction}</b>\n\n"
-        "Подтвердить?",
-        confirm_bet_keyboard("two_dice")
-    )
-
-
-@dp.callback_query(F.data == "confirm_two_dice")
-async def confirm_two_dice(
-    callback: CallbackQuery
-):
-    user_id = callback.from_user.id
-
-    game = games.get(user_id)
-
-    if not game:
-        await callback.answer(
-            "Игра устарела",
-            show_alert=True
-        )
-        return
-
-    stake = game["stake"]
-
     if not subtract_balance(
         user_id,
         stake
@@ -1605,55 +1392,117 @@ async def confirm_two_dice(
             show_alert=True
         )
         return
-
     await callback.answer()
-
+    # =====================================
+    # БРОСОК 1 РАЗ
+    # =====================================
+    if prediction in {
+        "dice_single_less",
+        "dice_single_more"
+    }:
+        dice = await callback.message.answer_dice(
+            emoji="🎲"
+        )
+        await asyncio.sleep(3)
+        value = dice.dice.value
+        if prediction == "dice_single_less":
+            won = value < 4
+            multiplier = 1.85
+        else:
+            won = value > 3
+            multiplier = 1.85
+        if won:
+            payout = int(
+                stake * multiplier
+            )
+            change_balance(
+                user_id,
+                payout
+            )
+            record_game(
+                user_id,
+                "dice",
+                stake,
+                "win",
+                multiplier,
+                payout
+            )
+            text = (
+                "╭────────────────────╮\n"
+                "       🏆 <b>WIN</b>\n"
+                "╰────────────────────╯\n\n"
+                f"🎲 Выпало: <b>{value}</b>\n\n"
+                "✅ <b>ПОБЕДА</b>\n"
+                f"💰 Выигрыш: "
+                f"<b>+{money(payout)} ₽</b>\n"
+                f"💳 Баланс: "
+                f"<b>{money(get_balance(user_id))} ₽</b>"
+            )
+        else:
+            record_game(
+                user_id,
+                "dice",
+                stake,
+                "loss",
+                0,
+                0
+            )
+            text = (
+                "╭────────────────────╮\n"
+                "       💥 <b>LOSS</b>\n"
+                "╰────────────────────╯\n\n"
+                f"🎲 Выпало: <b>{value}</b>\n\n"
+                "❌ <b>ПРОИГРЫШ</b>\n"
+                f"💳 Баланс: "
+                f"<b>{money(get_balance(user_id))} ₽</b>"
+            )
+        games.pop(
+            user_id,
+            None
+        )
+        await callback.message.answer(
+            text,
+            reply_markup=after_game_keyboard()
+        )
+        return
+    # =====================================
+    # БРОСОК 2 РАЗА
+    # =====================================
     dice1 = await callback.message.answer_dice(
         emoji="🎲"
     )
-
     dice2 = await callback.message.answer_dice(
         emoji="🎲"
     )
-
     await asyncio.sleep(3)
-
     value1 = dice1.dice.value
     value2 = dice2.dice.value
-
     total = value1 + value2
-
-    prediction = game["prediction"]
-
-    won = False
-
-    if prediction == "high":
-        won = total >= 8
-
-    elif prediction == "low":
-        won = total <= 6
-
-    elif prediction == "seven":
+    if prediction == "dice_double_less":
+        won = total < 7
+        multiplier = 2.05
+    elif prediction == "dice_double_more":
+        won = total > 7
+        multiplier = 2.05
+    else:
         won = total == 7
-
+        multiplier = 5
     if won:
-        multiplier = 2
-        payout = stake * multiplier
-
+        payout = int(
+            stake * multiplier
+        )
         change_balance(
             user_id,
             payout
         )
-
         record_game(
             user_id,
-            "two_dice",
+            "dice",
             stake,
             "win",
             multiplier,
             payout
         )
-
         text = (
             "╭────────────────────╮\n"
             "       🏆 <b>WIN</b>\n"
@@ -1666,17 +1515,15 @@ async def confirm_two_dice(
             f"💳 Баланс: "
             f"<b>{money(get_balance(user_id))} ₽</b>"
         )
-
     else:
         record_game(
             user_id,
-            "two_dice",
+            "dice",
             stake,
             "loss",
             0,
             0
         )
-
         text = (
             "╭────────────────────╮\n"
             "       💥 <b>LOSS</b>\n"
@@ -1687,9 +1534,10 @@ async def confirm_two_dice(
             f"💳 Баланс: "
             f"<b>{money(get_balance(user_id))} ₽</b>"
         )
-
-    games.pop(user_id, None)
-
+    games.pop(
+        user_id,
+        None
+    )
     await callback.message.answer(
         text,
         reply_markup=after_game_keyboard()
