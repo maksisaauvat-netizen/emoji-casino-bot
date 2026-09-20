@@ -4446,17 +4446,90 @@ async def handle_admin_message(
 
     return False
 
+async def handle_stake_message(message: Message, state: dict):
+    user_id = message.from_user.id
 
+    if not state.get("awaiting_stake"):
+        return False
+
+    text = (message.text or "").strip()
+
+    try:
+        stake = int(text)
+    except (TypeError, ValueError):
+        await message.answer(
+            "❌ <b>Неверная ставка</b>\n\n"
+            "Введите целое число.\n\n"
+            "Например: <code>350</code>"
+        )
+        return True
+
+    if stake < 50:
+        await message.answer(
+            "❌ <b>Минимальная ставка — 50 ₽</b>\n\n"
+            "Введите другую сумму."
+        )
+        return True
+
+    balance = get_balance(user_id)
+
+    if stake > balance:
+        await message.answer(
+            "❌ <b>Недостаточно средств</b>\n\n"
+            f"💳 Ваш баланс: <b>{money(balance)} ₽</b>\n"
+            f"💎 Ваша ставка: <b>{money(stake)} ₽</b>"
+        )
+        return True
+
+    game_type = state.get("type")
+
+    games[user_id] = {
+        "type": game_type,
+        "stake": stake
+    }
+
+    if game_type == "roulette":
+        builder = InlineKeyboardBuilder()
+
+        builder.button(
+            text="🔴  КРАСНОЕ",
+            callback_data="roulette_red"
+        )
+
+        builder.button(
+            text="⚫  ЧЁРНОЕ",
+            callback_data="roulette_black"
+        )
+
+        builder.button(
+            text="🟢  ZERO",
+            callback_data="roulette_zero"
+        )
+
+        builder.button(
+            text="⬅️  НАЗАД",
+            callback_data="game_roulette"
+        )
+
+        builder.adjust(1)
+
+        await message.answer(
+            "╭────────────────────╮\n"
+            "       🎡 <b>ROULETTE</b>\n"
+            "╰────────────────────╯\n\n"
+            f"💎 Ставка: <b>{money(stake)} ₽</b>\n\n"
+            "Выберите ставку:",
+            reply_markup=builder.as_markup()
+        )
+
+    return True
 # =========================================================
 # SINGLE MESSAGE HANDLER
 # =========================================================
 
 @dp.message()
-async def text_message_handler(
-    message: Message
-):
+async def text_message_handler(message: Message):
     user_id = message.from_user.id
-
     state = games.get(user_id)
 
     if not state:
@@ -4473,6 +4546,15 @@ async def text_message_handler(
 
     if state.get("admin_action"):
         handled = await handle_admin_message(
+            message,
+            state
+        )
+
+        if handled:
+            return
+
+    if state.get("awaiting_stake"):
+        handled = await handle_stake_message(
             message,
             state
         )
