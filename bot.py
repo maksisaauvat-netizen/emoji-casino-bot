@@ -25,12 +25,19 @@ from database import (
     DB_PATH,
 )
 
+from payments import (
+    create_invoice,
+    process_paid_invoice,
+    get_payment_info,
+)
+
 
 # =========================================================
 # CONFIG
 # =========================================================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+
 WEBHOOK_SECRET = os.getenv(
     "WEBHOOK_SECRET",
     "emoji_casino_secret_2026_x7k9"
@@ -124,6 +131,11 @@ def main_keyboard(user_id: int):
     builder.button(
         text="🎰  МИНИ-ИГРЫ",
         callback_data="menu_games"
+    )
+
+    builder.button(
+        text="💳  КОШЕЛЁК",
+        callback_data="wallet"
     )
 
     builder.button(
@@ -262,6 +274,360 @@ async def show_main_menu(
             text,
             reply_markup=main_keyboard(user_id)
         )
+
+
+# =========================================================
+# WALLET
+# =========================================================
+
+def wallet_keyboard():
+
+    builder = InlineKeyboardBuilder()
+
+    builder.button(
+        text="➕ ПОПОЛНИТЬ",
+        callback_data="deposit"
+    )
+
+    builder.button(
+        text="📂 НАЗАД",
+        callback_data="main_menu"
+    )
+
+    builder.adjust(1)
+
+    return builder.as_markup()
+
+
+def deposit_keyboard():
+
+    builder = InlineKeyboardBuilder()
+
+    builder.button(
+        text="1 USDT → 80 ₽",
+        callback_data="deposit_1"
+    )
+
+    builder.button(
+        text="5 USDT → 400 ₽",
+        callback_data="deposit_5"
+    )
+
+    builder.button(
+        text="10 USDT → 800 ₽",
+        callback_data="deposit_10"
+    )
+
+    builder.button(
+        text="25 USDT → 2 000 ₽",
+        callback_data="deposit_25"
+    )
+
+    builder.button(
+        text="50 USDT → 4 000 ₽",
+        callback_data="deposit_50"
+    )
+
+    builder.button(
+        text="📂 НАЗАД",
+        callback_data="wallet"
+    )
+
+    builder.adjust(1)
+
+    return builder.as_markup()
+
+
+@dp.callback_query(F.data == "wallet")
+async def wallet_menu(
+    callback: CallbackQuery
+):
+
+    await callback.answer()
+
+    user_id = callback.from_user.id
+
+    info = get_payment_info(
+        user_id
+    )
+
+    text = (
+        "💳 <b>КОШЕЛЁК</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        f"💰 Баланс: <b>{money(info['balance'])} ₽</b>\n\n"
+        f"💱 Курс: <b>1 USDT = {info['rate']} ₽</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "Пополнение производится через "
+        "<b>Crypto Pay</b>.\n\n"
+        "Выбери действие:"
+    )
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=wallet_keyboard()
+    )
+
+
+@dp.callback_query(F.data == "deposit")
+async def deposit_menu(
+    callback: CallbackQuery
+):
+
+    await callback.answer()
+
+    await callback.message.edit_text(
+        "➕ <b>ПОПОЛНЕНИЕ</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "💱 Тестовый курс:\n"
+        "<b>1 USDT = 80 ₽</b>\n\n"
+        "Выбери сумму пополнения:",
+        reply_markup=deposit_keyboard()
+    )
+
+
+@dp.callback_query(F.data.startswith("deposit_"))
+async def create_deposit(
+    callback: CallbackQuery
+):
+
+    user_id = callback.from_user.id
+
+    try:
+
+        amount_usdt = float(
+            callback.data.split("_")[-1]
+        )
+
+    except (ValueError, IndexError):
+
+        await callback.answer(
+            "❌ Неверная сумма.",
+            show_alert=True
+        )
+        return
+
+    await callback.answer(
+        "⏳ Создаю счёт..."
+    )
+
+    try:
+
+        invoice = await create_invoice(
+            user_id,
+            amount_usdt
+        )
+
+    except Exception as error:
+
+        print(
+            "CRYPTO PAY ERROR:",
+            error
+        )
+
+        await callback.message.edit_text(
+            "❌ <b>ОШИБКА ПЛАТЕЖА</b>\n\n"
+            "Не удалось создать счёт Crypto Pay.\n\n"
+            "Проверь настройки Crypto Pay "
+            "и попробуй ещё раз.",
+            reply_markup=wallet_keyboard()
+        )
+
+        return
+
+    pay_url = (
+        invoice.get("bot_invoice_url")
+        or invoice.get("pay_url")
+    )
+
+    if not pay_url:
+
+        await callback.message.edit_text(
+            "❌ Crypto Pay не вернул ссылку "
+            "для оплаты.",
+            reply_markup=wallet_keyboard()
+        )
+
+        return
+
+    amount_rub = invoice["amount_rub"]
+
+    builder = InlineKeyboardBuilder()
+
+    builder.button(
+        text=f"💳 ОПЛАТИТЬ {amount_usdt:g} USDT",
+        url=pay_url
+    )
+
+    builder.button(
+        text="🔄 ПРОВЕРИТЬ ОПЛАТУ",
+        callback_data=(
+            f"check_payment_{invoice['invoice_id']}"
+        )
+    )
+
+    builder.button(
+        text="📂 КОШЕЛЁК",
+        callback_data="wallet"
+    )
+
+    builder.adjust(1)
+
+    # Запускаем фоновую проверку платежа.
+    asyncio.create_task(
+        payment_checker(
+            user_id,
+            invoice["invoice_id"]
+        )
+    )
+
+    await callback.message.edit_text(
+        "💳 <b>СЧЁТ СОЗДАН</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        f"💵 Сумма: <b>{amount_usdt:g} USDT</b>\n"
+        f"💰 Зачисление: <b>{money(amount_rub)} ₽</b>\n"
+        "💱 Курс: <b>1 USDT = 80 ₽</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "Нажми кнопку ниже и оплати счёт.\n\n"
+        "После оплаты можно нажать "
+        "<b>«ПРОВЕРИТЬ ОПЛАТУ»</b>."
+        ,
+        reply_markup=builder.as_markup()
+    )
+
+
+# =========================================================
+# PAYMENT CHECK
+# =========================================================
+
+async def payment_checker(
+    user_id: int,
+    invoice_id: int
+):
+
+    for _ in range(360):
+
+        await asyncio.sleep(5)
+
+        try:
+
+            result = await process_paid_invoice(
+                invoice_id
+            )
+
+        except Exception as error:
+
+            print(
+                "PAYMENT CHECK ERROR:",
+                error
+            )
+
+            continue
+
+        if result is None:
+            continue
+
+        if result["user_id"] != user_id:
+            return
+
+        try:
+
+            await bot.send_message(
+                user_id,
+                "✅ <b>ОПЛАТА ПОЛУЧЕНА!</b>\n\n"
+                f"💵 Получено: "
+                f"<b>{result['amount_usdt']:g} USDT</b>\n"
+                f"💰 Зачислено: "
+                f"<b>+{money(result['amount_rub'])} ₽</b>\n\n"
+                f"💳 Баланс: "
+                f"<b>{money(result['balance'])} ₽</b>"
+            )
+
+        except Exception as error:
+
+            print(
+                "PAYMENT MESSAGE ERROR:",
+                error
+            )
+
+        return
+
+
+@dp.callback_query(
+    F.data.startswith("check_payment_")
+)
+async def check_payment(
+    callback: CallbackQuery
+):
+
+    user_id = callback.from_user.id
+
+    try:
+
+        invoice_id = int(
+            callback.data.split("_")[-1]
+        )
+
+    except (ValueError, IndexError):
+
+        await callback.answer(
+            "❌ Неверный счёт.",
+            show_alert=True
+        )
+        return
+
+    await callback.answer(
+        "🔄 Проверяю оплату..."
+    )
+
+    try:
+
+        result = await process_paid_invoice(
+            invoice_id
+        )
+
+    except Exception as error:
+
+        print(
+            "MANUAL PAYMENT CHECK ERROR:",
+            error
+        )
+
+        await callback.answer(
+            "❌ Ошибка проверки платежа.",
+            show_alert=True
+        )
+
+        return
+
+    if result is None:
+
+        await callback.answer(
+            "⏳ Оплата ещё не получена.",
+            show_alert=True
+        )
+
+        return
+
+    if result["user_id"] != user_id:
+
+        await callback.answer(
+            "❌ Этот счёт принадлежит другому пользователю.",
+            show_alert=True
+        )
+
+        return
+
+    await callback.message.edit_text(
+        "✅ <b>ОПЛАТА ПОЛУЧЕНА!</b>\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        f"💵 Получено: "
+        f"<b>{result['amount_usdt']:g} USDT</b>\n"
+        f"💰 Зачислено: "
+        f"<b>+{money(result['amount_rub'])} ₽</b>\n\n"
+        f"💳 Баланс: "
+        f"<b>{money(result['balance'])} ₽</b>",
+        reply_markup=wallet_keyboard()
+    )
 
 
 # =========================================================
@@ -899,9 +1265,6 @@ async def roulette_play(callback: CallbackQuery):
         )
         return
 
-    if callback.data == "roulette_stake":
-        return
-
     if callback.data in (
         "roulette_red",
         "roulette_black",
@@ -1394,7 +1757,7 @@ async def mines_play(callback: CallbackQuery):
             "💣 <b>МИНЫ</b>\n\n"
             "💥 <b>МИНА!</b>\n\n"
             f"💸 Потеряно: {money(game['stake'])} ₽\n"
-            f"💳 Баланс: {money(get_balance(user_id))} ₽",
+            f"💳 Баланс: <b>{money(get_balance(user_id))} ₽</b>",
             reply_markup=after_game_keyboard()
         )
 
@@ -2264,6 +2627,7 @@ def admin_target_view(
     new_balance: int,
     amount: int
 ):
+
     builder = InlineKeyboardBuilder()
 
     builder.button(
@@ -2304,10 +2668,13 @@ def admin_target_view(
     builder.adjust(3, 3, 1)
 
     if amount > 0:
+
         action_text = (
             f"🟢 Добавлено: <b>+{money(amount)} ₽</b>"
         )
+
     else:
+
         action_text = (
             f"🔴 Списано: <b>{money(abs(amount))} ₽</b>"
         )
@@ -2355,15 +2722,12 @@ async def admin_change_target_balance(
         )
         return
 
-    # -----------------------------------------------------
-    # ЗАЩИТА ОТ ПОВТОРНОГО НАЖАТИЯ
-    # -----------------------------------------------------
-
     callback_key = (
         f"admin_action_{callback.id}"
     )
 
     if callback_key in games:
+
         await callback.answer(
             "Это действие уже выполнено.",
             show_alert=True
@@ -2372,20 +2736,12 @@ async def admin_change_target_balance(
 
     games[callback_key] = True
 
-    # -----------------------------------------------------
-    # ДОБАВЛЕНИЕ
-    # -----------------------------------------------------
-
     if amount > 0:
 
         new_balance = change_balance(
             target_id,
             amount
         )
-
-    # -----------------------------------------------------
-    # СНЯТИЕ
-    # -----------------------------------------------------
 
     else:
 
@@ -2490,7 +2846,10 @@ async def admin_sub_1000(
     await admin_change_target_balance(
         callback,
         -1000
-    )# =========================================================
+    )
+
+
+# =========================================================
 # ADMIN STATISTICS
 # =========================================================
 
