@@ -67,19 +67,11 @@ async def crypto_request(
             return result.get("result")
 
 
-# =========================================================
-# GET APP
-# =========================================================
-
 async def get_crypto_app():
     return await crypto_request(
         "getMe"
     )
 
-
-# =========================================================
-# CREATE INVOICE
-# =========================================================
 
 async def create_invoice(
     user_id: int,
@@ -120,10 +112,6 @@ async def create_invoice(
     }
 
 
-# =========================================================
-# GET INVOICE
-# =========================================================
-
 async def get_invoice(
     invoice_id: int
 ):
@@ -143,14 +131,20 @@ async def get_invoice(
     if not result:
         return None
 
-    invoice = result[0]
+    # Crypto Pay returns:
+    # {"items": [invoice, ...]}
+    items = result.get("items", [])
 
-    return invoice
+    if not items:
+        return None
 
+    # Find the exact requested invoice
+    for invoice in items:
+        if int(invoice.get("invoice_id", 0)) == int(invoice_id):
+            return invoice
 
-# =========================================================
-# CHECK PAYMENT
-# =========================================================
+    return None
+
 
 async def check_invoice_paid(
     invoice_id: int
@@ -172,10 +166,6 @@ async def check_invoice_paid(
 
     return status == "paid"
 
-
-# =========================================================
-# PROCESS PAID INVOICE
-# =========================================================
 
 async def process_paid_invoice(
     invoice_id: int
@@ -261,10 +251,6 @@ async def process_paid_invoice(
     return result
 
 
-# =========================================================
-# CURRENCY
-# =========================================================
-
 def usdt_to_rub(
     amount_usdt: float
 ) -> int:
@@ -286,10 +272,6 @@ def rub_to_usdt(
     )
 
 
-# =========================================================
-# PAYMENT INFO
-# =========================================================
-
 async def get_payment_info(
     invoice_id: int
 ):
@@ -307,13 +289,15 @@ async def get_payment_info(
     except Exception:
         amount_usdt = 0
 
+    payload = invoice.get("payload")
+
     return {
         "invoice_id": int(
             invoice.get("invoice_id")
         ),
         "user_id": (
-            int(invoice["payload"])
-            if invoice.get("payload")
+            int(payload)
+            if payload
             else None
         ),
         "amount_usdt": amount_usdt,
