@@ -1,42 +1,26 @@
 import sqlite3
 from pathlib import Path
 
-
 DB_PATH = Path("casino.db")
 
 
 def get_connection():
-    connection = sqlite3.connect(
-        DB_PATH,
-        timeout=15.0
-    )
-
+    connection = sqlite3.connect(DB_PATH, timeout=15.0)
     connection.row_factory = sqlite3.Row
-
-    connection.execute(
-        "PRAGMA journal_mode=WAL"
-    )
-
-    connection.execute(
-        "PRAGMA busy_timeout=15000"
-    )
-
-    connection.execute(
-        "PRAGMA synchronous=NORMAL"
-    )
-
+    connection.execute("PRAGMA journal_mode=WAL")
+    connection.execute("PRAGMA busy_timeout=15000")
+    connection.execute("PRAGMA synchronous=NORMAL")
     return connection
 
 
 def init_db():
     connection = get_connection()
-
     try:
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
-                balance INTEGER NOT NULL DEFAULT 0,
+                balance INTEGER NOT NULL DEFAULT 1000,
                 games_played INTEGER NOT NULL DEFAULT 0,
                 wins INTEGER NOT NULL DEFAULT 0,
                 losses INTEGER NOT NULL DEFAULT 0,
@@ -82,44 +66,28 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
                 amount_rub INTEGER NOT NULL,
-                method TEXT NOT NULL,
-                destination TEXT NOT NULL,
+                payout_details TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'pending',
+                admin_note TEXT NOT NULL DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                processed_at TIMESTAMP,
-                admin_id INTEGER
+                processed_at TIMESTAMP
             )
             """
         )
 
-        # -------------------------------------------------
-        # ВАЖНО:
-        # Старые пользователи сохраняют свои реальные балансы.
-        #
-        # Новые пользователи теперь создаются с 0 ₽.
-        # Стартовые 1000 ₽ выдаются только через ensure_user()
-        # при первом /start.
-        # -------------------------------------------------
-
         connection.commit()
-
     finally:
         connection.close()
 
 
-def ensure_user(user_id: int) -> bool:
+def ensure_user(user_id: int):
     """
-    Создаёт пользователя только один раз.
-
-    Возвращает:
-        True  -> пользователь создан впервые
-        False -> пользователь уже существовал
+    Создаёт пользователя только если его ещё нет.
+    Стартовые 1000 начисляются только здесь.
     """
-
     connection = get_connection()
-
     try:
-        cursor = connection.execute(
+        connection.execute(
             """
             INSERT OR IGNORE INTO users (
                 user_id,
@@ -129,18 +97,13 @@ def ensure_user(user_id: int) -> bool:
             """,
             (user_id,)
         )
-
         connection.commit()
-
-        return cursor.rowcount == 1
-
     finally:
         connection.close()
 
 
 def user_exists(user_id: int) -> bool:
     connection = get_connection()
-
     try:
         row = connection.execute(
             """
@@ -150,16 +113,17 @@ def user_exists(user_id: int) -> bool:
             """,
             (user_id,)
         ).fetchone()
-
         return row is not None
-
     finally:
         connection.close()
 
 
 def get_balance(user_id: int) -> int:
+    """
+    Только читает баланс.
+    Никаких автоматических стартовых 1000.
+    """
     connection = get_connection()
-
     try:
         row = connection.execute(
             """
@@ -174,41 +138,25 @@ def get_balance(user_id: int) -> int:
             return 0
 
         return row["balance"]
-
     finally:
         connection.close()
 
 
-def change_balance(
-    user_id: int,
-    amount: int
-) -> int:
-
+def change_balance(user_id: int, amount: int) -> int:
     connection = get_connection()
-
     try:
-        connection.execute(
-            """
-            INSERT OR IGNORE INTO users (
-                user_id,
-                balance
-            )
-            VALUES (?, 0)
-            """,
-            (user_id,)
-        )
-
-        connection.execute(
+        cursor = connection.execute(
             """
             UPDATE users
             SET balance = balance + ?
             WHERE user_id = ?
             """,
-            (
-                amount,
-                user_id
-            )
+            (amount, user_id)
         )
+
+        if cursor.rowcount != 1:
+            connection.rollback()
+            raise ValueError("User is not registered")
 
         row = connection.execute(
             """
@@ -220,20 +168,13 @@ def change_balance(
         ).fetchone()
 
         connection.commit()
-
         return row["balance"]
-
     finally:
         connection.close()
 
 
-def subtract_balance(
-    user_id: int,
-    amount: int
-) -> bool:
-
+def subtract_balance(user_id: int, amount: int) -> bool:
     connection = get_connection()
-
     try:
         cursor = connection.execute(
             """
@@ -242,27 +183,18 @@ def subtract_balance(
             WHERE user_id = ?
               AND balance >= ?
             """,
-            (
-                amount,
-                user_id,
-                amount
-            )
+            (amount, user_id, amount)
         )
 
         success = cursor.rowcount == 1
-
         connection.commit()
-
         return success
-
     finally:
         connection.close()
 
 
 def get_user_stats(user_id: int):
-
     connection = get_connection()
-
     try:
         row = connection.execute(
             """
@@ -290,11 +222,10 @@ def get_user_stats(user_id: int):
                 "losses": 0,
                 "total_bet": 0,
                 "total_won": 0,
-                "biggest_win": 0
+                "biggest_win": 0,
             }
 
         return dict(row)
-
     finally:
         connection.close()
 
@@ -307,27 +238,23 @@ def record_game(
     multiplier: float = 0,
     payout: int = 0
 ):
-
     connection = get_connection()
-
     try:
-        wins = (
-            1
-            if result == "win"
-            else 0
-        )
+        user = connection.execute(
+            """
+            SELECT user_id
+            FROM users
+            WHERE user_id = ?
+            """,
+            (user_id,)
+        ).fetchone()
 
-        losses = (
-            1
-            if result == "loss"
-            else 0
-        )
+        if user is None:
+            raise ValueError("User is not registered")
 
-        win_amount = (
-            payout
-            if result == "win"
-            else 0
-        )
+        wins = 1 if result == "win" else 0
+        losses = 1 if result == "loss" else 0
+        win_amount = payout if result == "win" else 0
 
         connection.execute(
             """
@@ -377,18 +304,12 @@ def record_game(
         )
 
         connection.commit()
-
     finally:
         connection.close()
 
 
-def get_game_history(
-    user_id: int,
-    limit: int = 10
-):
-
+def get_game_history(user_id: int, limit: int = 10):
     connection = get_connection()
-
     try:
         rows = connection.execute(
             """
@@ -404,31 +325,16 @@ def get_game_history(
             ORDER BY id DESC
             LIMIT ?
             """,
-            (
-                user_id,
-                limit
-            )
+            (user_id, limit)
         ).fetchall()
 
-        return [
-            dict(row)
-            for row in rows
-        ]
-
+        return [dict(row) for row in rows]
     finally:
         connection.close()
 
 
-# =========================================================
-# PAYMENTS
-# =========================================================
-
-def payment_exists(
-    invoice_id: int
-) -> bool:
-
+def payment_exists(invoice_id: int) -> bool:
     connection = get_connection()
-
     try:
         row = connection.execute(
             """
@@ -440,7 +346,6 @@ def payment_exists(
         ).fetchone()
 
         return row is not None
-
     finally:
         connection.close()
 
@@ -451,9 +356,7 @@ def add_payment(
     amount_usdt: float,
     amount_rub: int
 ) -> bool:
-
     connection = get_connection()
-
     try:
         cursor = connection.execute(
             """
@@ -475,9 +378,7 @@ def add_payment(
         )
 
         connection.commit()
-
         return cursor.rowcount == 1
-
     finally:
         connection.close()
 
@@ -488,13 +389,23 @@ def process_payment(
     amount_usdt: float,
     amount_rub: int
 ):
-
     connection = get_connection()
 
     try:
-        connection.execute(
-            "BEGIN IMMEDIATE"
-        )
+        connection.execute("BEGIN IMMEDIATE")
+
+        user = connection.execute(
+            """
+            SELECT user_id
+            FROM users
+            WHERE user_id = ?
+            """,
+            (user_id,)
+        ).fetchone()
+
+        if user is None:
+            connection.rollback()
+            raise ValueError("User is not registered")
 
         existing = connection.execute(
             """
@@ -528,29 +439,13 @@ def process_payment(
             )
         )
 
-        # Пользователь должен существовать.
-        # Если нет — создаём с 0, НЕ с 1000.
-        connection.execute(
-            """
-            INSERT OR IGNORE INTO users (
-                user_id,
-                balance
-            )
-            VALUES (?, 0)
-            """,
-            (user_id,)
-        )
-
         connection.execute(
             """
             UPDATE users
             SET balance = balance + ?
             WHERE user_id = ?
             """,
-            (
-                amount_rub,
-                user_id
-            )
+            (amount_rub, user_id)
         )
 
         row = connection.execute(
@@ -582,12 +477,8 @@ def process_payment(
         connection.close()
 
 
-def get_payment(
-    invoice_id: int
-):
-
+def get_payment(invoice_id: int):
     connection = get_connection()
-
     try:
         row = connection.execute(
             """
@@ -608,18 +499,12 @@ def get_payment(
             return None
 
         return dict(row)
-
     finally:
         connection.close()
 
 
-def get_payment_history(
-    user_id: int,
-    limit: int = 20
-):
-
+def get_payment_history(user_id: int, limit: int = 20):
     connection = get_connection()
-
     try:
         rows = connection.execute(
             """
@@ -634,40 +519,56 @@ def get_payment_history(
             ORDER BY id DESC
             LIMIT ?
             """,
-            (
-                user_id,
-                limit
-            )
+            (user_id, limit)
         ).fetchall()
 
-        return [
-            dict(row)
-            for row in rows
-        ]
-
+        return [dict(row) for row in rows]
     finally:
         connection.close()
 
 
-# =========================================================
+# ============================================================
 # WITHDRAWALS
-# =========================================================
+# ============================================================
 
 def create_withdrawal(
     user_id: int,
     amount_rub: int,
-    method: str,
-    destination: str
+    payout_details: str
 ):
+    """
+    Создаёт заявку на вывод и сразу резервирует деньги,
+    уменьшая баланс игрока.
+    """
+
+    if amount_rub <= 0:
+        raise ValueError("Withdrawal amount must be positive")
+
+    if not payout_details.strip():
+        raise ValueError("Payout details are required")
 
     connection = get_connection()
 
     try:
-        connection.execute(
-            "BEGIN IMMEDIATE"
-        )
+        connection.execute("BEGIN IMMEDIATE")
 
-        # Проверяем баланс внутри той же транзакции.
+        user = connection.execute(
+            """
+            SELECT balance
+            FROM users
+            WHERE user_id = ?
+            """,
+            (user_id,)
+        ).fetchone()
+
+        if user is None:
+            connection.rollback()
+            raise ValueError("User is not registered")
+
+        if user["balance"] < amount_rub:
+            connection.rollback()
+            return None
+
         cursor = connection.execute(
             """
             UPDATE users
@@ -691,32 +592,40 @@ def create_withdrawal(
             INSERT INTO withdrawals (
                 user_id,
                 amount_rub,
-                method,
-                destination,
+                payout_details,
                 status
             )
-            VALUES (?, ?, ?, ?, 'pending')
+            VALUES (?, ?, ?, 'pending')
             """,
             (
                 user_id,
                 amount_rub,
-                method,
-                destination
+                payout_details.strip()
             )
         )
 
         withdrawal_id = cursor.lastrowid
 
+        row = connection.execute(
+            """
+            SELECT
+                id,
+                user_id,
+                amount_rub,
+                payout_details,
+                status,
+                admin_note,
+                created_at,
+                processed_at
+            FROM withdrawals
+            WHERE id = ?
+            """,
+            (withdrawal_id,)
+        ).fetchone()
+
         connection.commit()
 
-        return {
-            "id": withdrawal_id,
-            "user_id": user_id,
-            "amount_rub": amount_rub,
-            "method": method,
-            "destination": destination,
-            "status": "pending"
-        }
+        return dict(row)
 
     except Exception:
         connection.rollback()
@@ -726,12 +635,8 @@ def create_withdrawal(
         connection.close()
 
 
-def get_withdrawal(
-    withdrawal_id: int
-):
-
+def get_withdrawal(withdrawal_id: int):
     connection = get_connection()
-
     try:
         row = connection.execute(
             """
@@ -739,12 +644,11 @@ def get_withdrawal(
                 id,
                 user_id,
                 amount_rub,
-                method,
-                destination,
+                payout_details,
                 status,
+                admin_note,
                 created_at,
-                processed_at,
-                admin_id
+                processed_at
             FROM withdrawals
             WHERE id = ?
             """,
@@ -760,13 +664,8 @@ def get_withdrawal(
         connection.close()
 
 
-def get_withdrawals(
-    status: str = "pending",
-    limit: int = 20
-):
-
+def get_pending_withdrawals(limit: int = 20):
     connection = get_connection()
-
     try:
         rows = connection.execute(
             """
@@ -774,43 +673,51 @@ def get_withdrawals(
                 id,
                 user_id,
                 amount_rub,
-                method,
-                destination,
+                payout_details,
                 status,
+                admin_note,
                 created_at,
-                processed_at,
-                admin_id
+                processed_at
             FROM withdrawals
-            WHERE status = ?
+            WHERE status = 'pending'
             ORDER BY id ASC
             LIMIT ?
             """,
-            (
-                status,
-                limit
-            )
+            (limit,)
         ).fetchall()
 
-        return [
-            dict(row)
-            for row in rows
-        ]
+        return [dict(row) for row in rows]
 
     finally:
         connection.close()
 
 
-def approve_withdrawal(
-    withdrawal_id: int,
-    admin_id: int
-):
+def approve_withdrawal(withdrawal_id: int):
+    """
+    Только перевод pending -> approved.
+    Деньги уже были зарезервированы при создании заявки.
+    """
 
     connection = get_connection()
 
     try:
-        connection.execute(
-            "BEGIN IMMEDIATE"
+        connection.execute("BEGIN IMMEDIATE")
+
+        cursor = connection.execute(
+            """
+            UPDATE withdrawals
+            SET
+                status = 'approved',
+                processed_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+              AND status = 'pending'
+            """,
+            (withdrawal_id,)
         )
+
+        if cursor.rowcount != 1:
+            connection.rollback()
+            return None
 
         row = connection.execute(
             """
@@ -818,36 +725,16 @@ def approve_withdrawal(
                 id,
                 user_id,
                 amount_rub,
-                status
+                payout_details,
+                status,
+                admin_note,
+                created_at,
+                processed_at
             FROM withdrawals
             WHERE id = ?
             """,
             (withdrawal_id,)
         ).fetchone()
-
-        if row is None:
-            connection.rollback()
-            return None
-
-        if row["status"] != "pending":
-            connection.rollback()
-            return None
-
-        connection.execute(
-            """
-            UPDATE withdrawals
-            SET
-                status = 'approved',
-                processed_at = CURRENT_TIMESTAMP,
-                admin_id = ?
-            WHERE id = ?
-              AND status = 'pending'
-            """,
-            (
-                admin_id,
-                withdrawal_id
-            )
-        )
 
         connection.commit()
 
@@ -861,17 +748,71 @@ def approve_withdrawal(
         connection.close()
 
 
-def reject_withdrawal(
-    withdrawal_id: int,
-    admin_id: int
-):
+def complete_withdrawal(withdrawal_id: int):
+    """
+    Используется после того, как админ реально отправил выплату.
+    """
 
     connection = get_connection()
 
     try:
-        connection.execute(
-            "BEGIN IMMEDIATE"
+        connection.execute("BEGIN IMMEDIATE")
+
+        cursor = connection.execute(
+            """
+            UPDATE withdrawals
+            SET
+                status = 'paid',
+                processed_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+              AND status = 'approved'
+            """,
+            (withdrawal_id,)
         )
+
+        if cursor.rowcount != 1:
+            connection.rollback()
+            return None
+
+        row = connection.execute(
+            """
+            SELECT
+                id,
+                user_id,
+                amount_rub,
+                payout_details,
+                status,
+                admin_note,
+                created_at,
+                processed_at
+            FROM withdrawals
+            WHERE id = ?
+            """,
+            (withdrawal_id,)
+        ).fetchone()
+
+        connection.commit()
+
+        return dict(row)
+
+    except Exception:
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
+def reject_withdrawal(withdrawal_id: int):
+    """
+    Отклоняет только pending-заявку.
+    При отказе деньги возвращаются игроку.
+    """
+
+    connection = get_connection()
+
+    try:
+        connection.execute("BEGIN IMMEDIATE")
 
         row = connection.execute(
             """
@@ -894,7 +835,22 @@ def reject_withdrawal(
             connection.rollback()
             return None
 
-        # Возвращаем деньги пользователю.
+        cursor = connection.execute(
+            """
+            UPDATE withdrawals
+            SET
+                status = 'rejected',
+                processed_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+              AND status = 'pending'
+            """,
+            (withdrawal_id,)
+        )
+
+        if cursor.rowcount != 1:
+            connection.rollback()
+            return None
+
         connection.execute(
             """
             UPDATE users
@@ -907,25 +863,26 @@ def reject_withdrawal(
             )
         )
 
-        connection.execute(
+        result = connection.execute(
             """
-            UPDATE withdrawals
-            SET
-                status = 'rejected',
-                processed_at = CURRENT_TIMESTAMP,
-                admin_id = ?
+            SELECT
+                id,
+                user_id,
+                amount_rub,
+                payout_details,
+                status,
+                admin_note,
+                created_at,
+                processed_at
+            FROM withdrawals
             WHERE id = ?
-              AND status = 'pending'
             """,
-            (
-                admin_id,
-                withdrawal_id
-            )
-        )
+            (withdrawal_id,)
+        ).fetchone()
 
         connection.commit()
 
-        return dict(row)
+        return dict(result)
 
     except Exception:
         connection.rollback()
@@ -935,11 +892,7 @@ def reject_withdrawal(
         connection.close()
 
 
-def get_user_withdrawals(
-    user_id: int,
-    limit: int = 20
-):
-
+def get_withdrawal_history(user_id: int, limit: int = 20):
     connection = get_connection()
 
     try:
@@ -948,9 +901,9 @@ def get_user_withdrawals(
             SELECT
                 id,
                 amount_rub,
-                method,
-                destination,
+                payout_details,
                 status,
+                admin_note,
                 created_at,
                 processed_at
             FROM withdrawals
@@ -964,10 +917,7 @@ def get_user_withdrawals(
             )
         ).fetchall()
 
-        return [
-            dict(row)
-            for row in rows
-        ]
+        return [dict(row) for row in rows]
 
     finally:
         connection.close()
