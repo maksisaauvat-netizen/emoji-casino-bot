@@ -1089,9 +1089,7 @@ async def handle_stake_message(
         "type": game_type,
         "stake": stake
     }
-    # =====================================================
     # DICE
-    # =====================================================
     if game_type == "dice":
         builder = InlineKeyboardBuilder()
         builder.button(
@@ -1121,9 +1119,7 @@ async def handle_stake_message(
             reply_markup=builder.as_markup()
         )
         return True
-    # =====================================================
     # TWO DICE
-    # =====================================================
     if game_type == "two_dice":
         builder = InlineKeyboardBuilder()
         builder.button(
@@ -1153,9 +1149,7 @@ async def handle_stake_message(
             reply_markup=builder.as_markup()
         )
         return True
-    # =====================================================
     # SLOTS
-    # =====================================================
     if game_type == "slots":
         await message.answer(
             "╭────────────────────╮\n"
@@ -1172,9 +1166,7 @@ async def handle_stake_message(
             reply_markup=confirm_bet_keyboard("slots")
         )
         return True
-    # =====================================================
     # BOWLING
-    # =====================================================
     if game_type == "bowling":
         builder = InlineKeyboardBuilder()
         builder.button(
@@ -1200,9 +1192,7 @@ async def handle_stake_message(
             reply_markup=builder.as_markup()
         )
         return True
-    # =====================================================
     # ROULETTE
-    # =====================================================
     if game_type == "roulette":
         builder = InlineKeyboardBuilder()
         builder.button(
@@ -1232,9 +1222,7 @@ async def handle_stake_message(
             reply_markup=builder.as_markup()
         )
         return True
-    # =====================================================
     # MINES
-    # =====================================================
     if game_type == "mines":
         await message.answer(
             "╭────────────────────╮\n"
@@ -1246,9 +1234,7 @@ async def handle_stake_message(
             reply_markup=confirm_bet_keyboard("mines")
         )
         return True
-    # =====================================================
     # CRASH
-    # =====================================================
     if game_type == "crash":
         await message.answer(
             "╭────────────────────╮\n"
@@ -1263,87 +1249,6 @@ async def handle_stake_message(
             reply_markup=confirm_bet_keyboard("crash")
         )
         return True
-    return True
-
-    # -----------------------------------------------------
-    # ROULETTE
-    # -----------------------------------------------------
-
-    if game_type == "roulette":
-
-        builder = InlineKeyboardBuilder()
-
-        builder.button(
-            text="🔴  КРАСНОЕ",
-            callback_data="roulette_red"
-        )
-
-        builder.button(
-            text="⚫  ЧЁРНОЕ",
-            callback_data="roulette_black"
-        )
-
-        builder.button(
-            text="🟢  ZERO",
-            callback_data="roulette_zero"
-        )
-
-        builder.button(
-            text="⬅️  НАЗАД",
-            callback_data="game_roulette"
-        )
-
-        builder.adjust(1)
-
-        await message.answer(
-            f"🎡 <b>ROULETTE</b>\n\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "Выберите цвет:",
-            reply_markup=builder.as_markup()
-        )
-
-        return True
-
-    # -----------------------------------------------------
-    # MINES
-    # -----------------------------------------------------
-
-    if game_type == "mines":
-
-        await message.answer(
-            "╭────────────────────╮\n"
-            "       💣 <b>MINES</b>\n"
-            "╰────────────────────╯\n\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "Подтвердить ставку?",
-            reply_markup=confirm_bet_keyboard("mines")
-        )
-
-        return True
-
-    # -----------------------------------------------------
-    # CRASH
-    # -----------------------------------------------------
-
-    if game_type == "crash":
-
-        await message.answer(
-            "╭────────────────────╮\n"
-            "       🚀 <b>CRASH</b>\n"
-            "╰────────────────────╯\n\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "Самолёт будет набирать множитель.\n"
-            "Ваша задача — забрать выигрыш "
-            "до CRASH.\n\n"
-            "Подтвердить ставку?",
-            reply_markup=confirm_bet_keyboard("crash")
-        )
-
-        return True
-
     return True
     
 # =========================================================
