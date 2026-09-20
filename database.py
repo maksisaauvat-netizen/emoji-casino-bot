@@ -5,89 +5,116 @@ from pathlib import Path
 DB_PATH = Path("casino.db")
 
 
+# =========================================================
+# CONNECTION
+# =========================================================
+
 def get_connection():
-    connection = sqlite3.connect(DB_PATH)
+    connection = sqlite3.connect(
+        DB_PATH,
+        timeout=15.0
+    )
+
     connection.row_factory = sqlite3.Row
+
+    # Разрешаем одновременное чтение во время записи.
+    connection.execute("PRAGMA journal_mode=WAL")
+
+    # SQLite будет ждать освобождения базы вместо
+    # немедленного "database is locked".
+    connection.execute("PRAGMA busy_timeout=15000")
+
+    # Более безопасная синхронизация записи.
+    connection.execute("PRAGMA synchronous=NORMAL")
+
     return connection
 
+
+# =========================================================
+# INIT DATABASE
+# =========================================================
 
 def init_db():
     connection = get_connection()
 
-    # =====================================================
-    # USERS
-    # =====================================================
+    try:
 
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS users (
-            user_id INTEGER PRIMARY KEY,
-            balance INTEGER NOT NULL DEFAULT 1000,
+        # =================================================
+        # USERS
+        # =================================================
 
-            games_played INTEGER NOT NULL DEFAULT 0,
-            wins INTEGER NOT NULL DEFAULT 0,
-            losses INTEGER NOT NULL DEFAULT 0,
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER PRIMARY KEY,
+                balance INTEGER NOT NULL DEFAULT 1000,
 
-            total_bet INTEGER NOT NULL DEFAULT 0,
-            total_won INTEGER NOT NULL DEFAULT 0,
+                games_played INTEGER NOT NULL DEFAULT 0,
+                wins INTEGER NOT NULL DEFAULT 0,
+                losses INTEGER NOT NULL DEFAULT 0,
 
-            biggest_win INTEGER NOT NULL DEFAULT 0
+                total_bet INTEGER NOT NULL DEFAULT 0,
+                total_won INTEGER NOT NULL DEFAULT 0,
+
+                biggest_win INTEGER NOT NULL DEFAULT 0
+            )
+            """
         )
-        """
-    )
 
-    # =====================================================
-    # GAME HISTORY
-    # =====================================================
+        # =================================================
+        # GAME HISTORY
+        # =================================================
 
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS game_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS game_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-            user_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
 
-            game TEXT NOT NULL,
+                game TEXT NOT NULL,
 
-            stake INTEGER NOT NULL DEFAULT 0,
+                stake INTEGER NOT NULL DEFAULT 0,
 
-            result TEXT NOT NULL,
+                result TEXT NOT NULL,
 
-            multiplier REAL NOT NULL DEFAULT 0,
+                multiplier REAL NOT NULL DEFAULT 0,
 
-            payout INTEGER NOT NULL DEFAULT 0,
+                payout INTEGER NOT NULL DEFAULT 0,
 
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
         )
-        """
-    )
 
-    # =====================================================
-    # PAYMENTS
-    # =====================================================
+        # =================================================
+        # PAYMENTS
+        # =================================================
 
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS payments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS payments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
 
-            invoice_id INTEGER NOT NULL UNIQUE,
+                invoice_id INTEGER NOT NULL UNIQUE,
 
-            user_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
 
-            amount_usdt REAL NOT NULL DEFAULT 0,
+                amount_usdt REAL NOT NULL DEFAULT 0,
 
-            amount_rub INTEGER NOT NULL DEFAULT 0,
+                amount_rub INTEGER NOT NULL DEFAULT 0,
 
-            status TEXT NOT NULL DEFAULT 'paid',
+                status TEXT NOT NULL DEFAULT 'paid',
 
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
         )
-        """
-    )
 
-    connection.commit()
-    connection.close()
+        connection.commit()
+
+    finally:
+        connection.close()
 
 
 # =========================================================
@@ -95,40 +122,14 @@ def init_db():
 # =========================================================
 
 def ensure_user(user_id: int):
+
     connection = get_connection()
 
-    connection.execute(
-        """
-        INSERT OR IGNORE INTO users (
-            user_id,
-            balance
-        )
-        VALUES (?, 1000)
-        """,
-        (user_id,)
-    )
-
-    connection.commit()
-    connection.close()
-
-
-def get_balance(user_id: int) -> int:
-    connection = get_connection()
-
-    row = connection.execute(
-        """
-        SELECT balance
-        FROM users
-        WHERE user_id = ?
-        """,
-        (user_id,)
-    ).fetchone()
-
-    if row is None:
+    try:
 
         connection.execute(
             """
-            INSERT INTO users (
+            INSERT OR IGNORE INTO users (
                 user_id,
                 balance
             )
@@ -139,15 +140,46 @@ def get_balance(user_id: int) -> int:
 
         connection.commit()
 
-        balance = 1000
+    finally:
+        connection.close()
 
-    else:
 
-        balance = row["balance"]
+def get_balance(user_id: int) -> int:
 
-    connection.close()
+    connection = get_connection()
 
-    return balance
+    try:
+
+        row = connection.execute(
+            """
+            SELECT balance
+            FROM users
+            WHERE user_id = ?
+            """,
+            (user_id,)
+        ).fetchone()
+
+        if row is None:
+
+            connection.execute(
+                """
+                INSERT INTO users (
+                    user_id,
+                    balance
+                )
+                VALUES (?, 1000)
+                """,
+                (user_id,)
+            )
+
+            connection.commit()
+
+            return 1000
+
+        return row["balance"]
+
+    finally:
+        connection.close()
 
 
 def change_balance(
@@ -155,38 +187,48 @@ def change_balance(
     amount: int
 ) -> int:
 
-    ensure_user(user_id)
-
     connection = get_connection()
 
-    connection.execute(
-        """
-        UPDATE users
-        SET balance = balance + ?
-        WHERE user_id = ?
-        """,
-        (
-            amount,
-            user_id
+    try:
+
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO users (
+                user_id,
+                balance
+            )
+            VALUES (?, 1000)
+            """,
+            (user_id,)
         )
-    )
 
-    connection.commit()
+        connection.execute(
+            """
+            UPDATE users
+            SET balance = balance + ?
+            WHERE user_id = ?
+            """,
+            (
+                amount,
+                user_id
+            )
+        )
 
-    row = connection.execute(
-        """
-        SELECT balance
-        FROM users
-        WHERE user_id = ?
-        """,
-        (user_id,)
-    ).fetchone()
+        row = connection.execute(
+            """
+            SELECT balance
+            FROM users
+            WHERE user_id = ?
+            """,
+            (user_id,)
+        ).fetchone()
 
-    balance = row["balance"]
+        connection.commit()
 
-    connection.close()
+        return row["balance"]
 
-    return balance
+    finally:
+        connection.close()
 
 
 def subtract_balance(
@@ -194,31 +236,43 @@ def subtract_balance(
     amount: int
 ) -> bool:
 
-    ensure_user(user_id)
-
     connection = get_connection()
 
-    cursor = connection.execute(
-        """
-        UPDATE users
-        SET balance = balance - ?
-        WHERE user_id = ?
-          AND balance >= ?
-        """,
-        (
-            amount,
-            user_id,
-            amount
+    try:
+
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO users (
+                user_id,
+                balance
+            )
+            VALUES (?, 1000)
+            """,
+            (user_id,)
         )
-    )
 
-    connection.commit()
+        cursor = connection.execute(
+            """
+            UPDATE users
+            SET balance = balance - ?
+            WHERE user_id = ?
+              AND balance >= ?
+            """,
+            (
+                amount,
+                user_id,
+                amount
+            )
+        )
 
-    success = cursor.rowcount == 1
+        success = cursor.rowcount == 1
 
-    connection.close()
+        connection.commit()
 
-    return success
+        return success
+
+    finally:
+        connection.close()
 
 
 # =========================================================
@@ -227,30 +281,44 @@ def subtract_balance(
 
 def get_user_stats(user_id: int):
 
-    ensure_user(user_id)
-
     connection = get_connection()
 
-    row = connection.execute(
-        """
-        SELECT
-            user_id,
-            balance,
-            games_played,
-            wins,
-            losses,
-            total_bet,
-            total_won,
-            biggest_win
-        FROM users
-        WHERE user_id = ?
-        """,
-        (user_id,)
-    ).fetchone()
+    try:
 
-    connection.close()
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO users (
+                user_id,
+                balance
+            )
+            VALUES (?, 1000)
+            """,
+            (user_id,)
+        )
 
-    return dict(row)
+        connection.commit()
+
+        row = connection.execute(
+            """
+            SELECT
+                user_id,
+                balance,
+                games_played,
+                wins,
+                losses,
+                total_bet,
+                total_won,
+                biggest_win
+            FROM users
+            WHERE user_id = ?
+            """,
+            (user_id,)
+        ).fetchone()
+
+        return dict(row)
+
+    finally:
+        connection.close()
 
 
 # =========================================================
@@ -266,80 +334,91 @@ def record_game(
     payout: int = 0
 ):
 
-    ensure_user(user_id)
-
     connection = get_connection()
 
-    games_played = 1
+    try:
 
-    wins = (
-        1
-        if result == "win"
-        else 0
-    )
-
-    losses = (
-        1
-        if result == "loss"
-        else 0
-    )
-
-    win_amount = (
-        payout
-        if result == "win"
-        else 0
-    )
-
-    connection.execute(
-        """
-        UPDATE users
-        SET
-            games_played = games_played + ?,
-            wins = wins + ?,
-            losses = losses + ?,
-            total_bet = total_bet + ?,
-            total_won = total_won + ?,
-            biggest_win = MAX(
-                biggest_win,
-                ?
+        # Гарантируем наличие пользователя.
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO users (
+                user_id,
+                balance
             )
-        WHERE user_id = ?
-        """,
-        (
-            games_played,
-            wins,
-            losses,
-            stake,
-            win_amount,
-            win_amount,
-            user_id
+            VALUES (?, 1000)
+            """,
+            (user_id,)
         )
-    )
 
-    connection.execute(
-        """
-        INSERT INTO game_history (
-            user_id,
-            game,
-            stake,
-            result,
-            multiplier,
-            payout
+        wins = (
+            1
+            if result == "win"
+            else 0
         )
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        (
-            user_id,
-            game,
-            stake,
-            result,
-            multiplier,
-            payout
-        )
-    )
 
-    connection.commit()
-    connection.close()
+        losses = (
+            1
+            if result == "loss"
+            else 0
+        )
+
+        win_amount = (
+            payout
+            if result == "win"
+            else 0
+        )
+
+        connection.execute(
+            """
+            UPDATE users
+            SET
+                games_played = games_played + 1,
+                wins = wins + ?,
+                losses = losses + ?,
+                total_bet = total_bet + ?,
+                total_won = total_won + ?,
+                biggest_win = MAX(
+                    biggest_win,
+                    ?
+                )
+            WHERE user_id = ?
+            """,
+            (
+                wins,
+                losses,
+                stake,
+                win_amount,
+                win_amount,
+                user_id
+            )
+        )
+
+        connection.execute(
+            """
+            INSERT INTO game_history (
+                user_id,
+                game,
+                stake,
+                result,
+                multiplier,
+                payout
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                game,
+                stake,
+                result,
+                multiplier,
+                payout
+            )
+        )
+
+        connection.commit()
+
+    finally:
+        connection.close()
 
 
 def get_game_history(
@@ -347,36 +426,50 @@ def get_game_history(
     limit: int = 10
 ):
 
-    ensure_user(user_id)
-
     connection = get_connection()
 
-    rows = connection.execute(
-        """
-        SELECT
-            game,
-            stake,
-            result,
-            multiplier,
-            payout,
-            created_at
-        FROM game_history
-        WHERE user_id = ?
-        ORDER BY id DESC
-        LIMIT ?
-        """,
-        (
-            user_id,
-            limit
+    try:
+
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO users (
+                user_id,
+                balance
+            )
+            VALUES (?, 1000)
+            """,
+            (user_id,)
         )
-    ).fetchall()
 
-    connection.close()
+        connection.commit()
 
-    return [
-        dict(row)
-        for row in rows
-    ]
+        rows = connection.execute(
+            """
+            SELECT
+                game,
+                stake,
+                result,
+                multiplier,
+                payout,
+                created_at
+            FROM game_history
+            WHERE user_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (
+                user_id,
+                limit
+            )
+        ).fetchall()
+
+        return [
+            dict(row)
+            for row in rows
+        ]
+
+    finally:
+        connection.close()
 
 
 # =========================================================
@@ -389,18 +482,21 @@ def payment_exists(
 
     connection = get_connection()
 
-    row = connection.execute(
-        """
-        SELECT id
-        FROM payments
-        WHERE invoice_id = ?
-        """,
-        (invoice_id,)
-    ).fetchone()
+    try:
 
-    connection.close()
+        row = connection.execute(
+            """
+            SELECT id
+            FROM payments
+            WHERE invoice_id = ?
+            """,
+            (invoice_id,)
+        ).fetchone()
 
-    return row is not None
+        return row is not None
+
+    finally:
+        connection.close()
 
 
 def add_payment(
@@ -409,17 +505,6 @@ def add_payment(
     amount_usdt: float,
     amount_rub: int
 ) -> bool:
-    """
-    Регистрирует оплаченный invoice.
-
-    Благодаря UNIQUE(invoice_id) один invoice
-    невозможно зачислить повторно.
-
-    Возвращает:
-
-    True  — платёж записан впервые.
-    False — этот invoice уже был обработан.
-    """
 
     connection = get_connection()
 
@@ -449,7 +534,6 @@ def add_payment(
         return cursor.rowcount == 1
 
     finally:
-
         connection.close()
 
 
@@ -460,29 +544,23 @@ def process_payment(
     amount_rub: int
 ):
     """
-    Безопасно обрабатывает оплаченный invoice.
+    Атомарно обрабатывает оплаченный invoice.
 
-    ВАЖНО:
-
-    Сначала invoice записывается в payments.
-    Только если он записан впервые,
-    пользователю начисляются деньги.
-
-    Повторная обработка того же invoice
-    ничего не начисляет.
+    Один invoice может быть зачислен только один раз.
     """
 
     connection = get_connection()
 
     try:
 
+        # Ждём освобождения базы до 15 секунд.
         connection.execute(
             "BEGIN IMMEDIATE"
         )
 
-        # -------------------------------------------------
-        # Проверяем, был ли invoice уже обработан
-        # -------------------------------------------------
+        # =================================================
+        # ПРОВЕРЯЕМ ПОВТОРНЫЙ INVOICE
+        # =================================================
 
         existing = connection.execute(
             """
@@ -499,9 +577,9 @@ def process_payment(
 
             return None
 
-        # -------------------------------------------------
-        # Создаём запись платежа
-        # -------------------------------------------------
+        # =================================================
+        # СОХРАНЯЕМ ПЛАТЁЖ
+        # =================================================
 
         connection.execute(
             """
@@ -522,9 +600,9 @@ def process_payment(
             )
         )
 
-        # -------------------------------------------------
-        # Гарантируем существование пользователя
-        # -------------------------------------------------
+        # =================================================
+        # СОЗДАЁМ USER, ЕСЛИ ЕГО НЕТ
+        # =================================================
 
         connection.execute(
             """
@@ -537,9 +615,9 @@ def process_payment(
             (user_id,)
         )
 
-        # -------------------------------------------------
-        # Начисляем деньги
-        # -------------------------------------------------
+        # =================================================
+        # НАЧИСЛЯЕМ БАЛАНС
+        # =================================================
 
         connection.execute(
             """
@@ -553,9 +631,9 @@ def process_payment(
             )
         )
 
-        # -------------------------------------------------
-        # Получаем новый баланс
-        # -------------------------------------------------
+        # =================================================
+        # ПОЛУЧАЕМ НОВЫЙ БАЛАНС
+        # =================================================
 
         row = connection.execute(
             """
@@ -585,7 +663,6 @@ def process_payment(
         raise
 
     finally:
-
         connection.close()
 
 
@@ -595,27 +672,30 @@ def get_payment(
 
     connection = get_connection()
 
-    row = connection.execute(
-        """
-        SELECT
-            invoice_id,
-            user_id,
-            amount_usdt,
-            amount_rub,
-            status,
-            created_at
-        FROM payments
-        WHERE invoice_id = ?
-        """,
-        (invoice_id,)
-    ).fetchone()
+    try:
 
-    connection.close()
+        row = connection.execute(
+            """
+            SELECT
+                invoice_id,
+                user_id,
+                amount_usdt,
+                amount_rub,
+                status,
+                created_at
+            FROM payments
+            WHERE invoice_id = ?
+            """,
+            (invoice_id,)
+        ).fetchone()
 
-    if row is None:
-        return None
+        if row is None:
+            return None
 
-    return dict(row)
+        return dict(row)
+
+    finally:
+        connection.close()
 
 
 def get_payment_history(
@@ -625,28 +705,31 @@ def get_payment_history(
 
     connection = get_connection()
 
-    rows = connection.execute(
-        """
-        SELECT
-            invoice_id,
-            amount_usdt,
-            amount_rub,
-            status,
-            created_at
-        FROM payments
-        WHERE user_id = ?
-        ORDER BY id DESC
-        LIMIT ?
-        """,
-        (
-            user_id,
-            limit
-        )
-    ).fetchall()
+    try:
 
-    connection.close()
+        rows = connection.execute(
+            """
+            SELECT
+                invoice_id,
+                amount_usdt,
+                amount_rub,
+                status,
+                created_at
+            FROM payments
+            WHERE user_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (
+                user_id,
+                limit
+            )
+        ).fetchall()
 
-    return [
-        dict(row)
-        for row in rows
-    ]
+        return [
+            dict(row)
+            for row in rows
+        ]
+
+    finally:
+        connection.close()
