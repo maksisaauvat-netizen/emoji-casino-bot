@@ -89,20 +89,20 @@ SLOT_SEVEN_MULTIPLIER = 50
 CRASH_MIN = 1.05
 CRASH_MAX = 20.0
 
-# 1 USDT = 80 ₽
-# Минимальный вывод = 1 USDT
+# 1 USDT = 80 â½
+# ÐÐ¸Ð½Ð¸Ð¼Ð°Ð»ÑÐ½ÑÐ¹ Ð²ÑÐ²Ð¾Ð´ = 1 USDT
 MIN_WITHDRAWAL = 80
 
 # =========================================================
 # PREMIUM PHOTOS
 # =========================================================
 #
-# Фотографии подключаются через Render Environment Variables.
+# Ð¤Ð¾ÑÐ¾Ð³ÑÐ°ÑÐ¸Ð¸ Ð¿Ð¾Ð´ÐºÐ»ÑÑÐ°ÑÑÑÑ ÑÐµÑÐµÐ· Render Environment Variables.
 #
-# Если переменная пустая — бот автоматически использует
-# обычный текстовый интерфейс.
+# ÐÑÐ»Ð¸ Ð¿ÐµÑÐµÐ¼ÐµÐ½Ð½Ð°Ñ Ð¿ÑÑÑÐ°Ñ â Ð±Ð¾Ñ Ð°Ð²ÑÐ¾Ð¼Ð°ÑÐ¸ÑÐµÑÐºÐ¸ Ð¸ÑÐ¿Ð¾Ð»ÑÐ·ÑÐµÑ
+# Ð¾Ð±ÑÑÐ½ÑÐ¹ ÑÐµÐºÑÑÐ¾Ð²ÑÐ¹ Ð¸Ð½ÑÐµÑÑÐµÐ¹Ñ.
 #
-# Позже сюда можно добавить Telegram file_id фотографий.
+# ÐÐ¾Ð·Ð¶Ðµ ÑÑÐ´Ð° Ð¼Ð¾Ð¶Ð½Ð¾ Ð´Ð¾Ð±Ð°Ð²Ð¸ÑÑ Telegram file_id ÑÐ¾ÑÐ¾Ð³ÑÐ°ÑÐ¸Ð¹.
 #
 
 PHOTO_MAIN = os.getenv("PHOTO_MAIN", "")
@@ -133,7 +133,7 @@ async def edit_or_answer(
     photo: str = ""
 ):
     """
-    Универсальное переключение:
+    Ð£Ð½Ð¸Ð²ÐµÑÑÐ°Ð»ÑÐ½Ð¾Ðµ Ð¿ÐµÑÐµÐºÐ»ÑÑÐµÐ½Ð¸Ðµ:
     text -> text
     text -> photo
     photo -> text
@@ -248,27 +248,27 @@ def main_keyboard(user_id: int):
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="🎰 | ИГРЫ",
+        text="ð° | ÐÐÐ Ð«",
         callback_data="games"
     )
 
     builder.button(
-        text="💰 | БАЛАНС",
+        text="ð° | ÐÐÐÐÐÐ¡",
         callback_data="wallet"
     )
 
     builder.button(
-        text="👤 | ПРОФИЛЬ",
+        text="ð¤ | ÐÐ ÐÐ¤ÐÐÐ¬",
         callback_data="profile"
     )
 
     builder.button(
-        text="💳 | ПОПОЛНИТЬ",
+        text="ð³ | ÐÐÐÐÐÐÐÐ¢Ð¬",
         callback_data="deposit"
     )
 
     builder.button(
-        text="💸 | ВЫВЕСТИ",
+        text="ð¸ | ÐÐ«ÐÐÐ¡Ð¢Ð",
         callback_data="withdraw"
     )
 
@@ -276,7 +276,7 @@ def main_keyboard(user_id: int):
 
     if is_admin(user_id):
         builder.button(
-            text="🛠 | ADMIN PANEL",
+            text="ð  | ADMIN PANEL",
             callback_data="admin"
         )
 
@@ -287,37 +287,37 @@ def games_keyboard():
     builder = InlineKeyboardBuilder()
 
 builder.button(
-    text="🎲 | DICE",
+    text="ð² | DICE",
     callback_data="game_dice"
 )
 
     builder.button(
-        text="🎰 | SLOTS",
+        text="ð° | SLOTS",
         callback_data="game_slots"
     )
 
     builder.button(
-        text="🎳 | BOWLING",
+        text="ð³ | BOWLING",
         callback_data="game_bowling"
     )
 
     builder.button(
-        text="🎡 | ROULLETE",
+        text="ð¡ | ROULLETE",
         callback_data="game_roulette"
     )
 
     builder.button(
-        text="💣 | MINES",
+        text="ð£ | MINES",
         callback_data="game_mines"
     )
 
     builder.button(
-        text="🚀 | CRASH",
+        text="ð | CRASH",
         callback_data="game_crash"
     )
 
     builder.button(
-        text="⬅️ | ГЛАВНОЕ МЕНЮ",
+        text="â¬ï¸ | ÐÐÐÐÐÐÐ ÐÐÐÐ®",
         callback_data="back_main"
     )
 
@@ -330,12 +330,12 @@ def stake_keyboard(prefix: str):
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="💎 | ВВЕСТИ СТАВКУ",
+        text="ð | ÐÐÐÐ¡Ð¢Ð Ð¡Ð¢ÐÐÐÐ£",
         callback_data=f"{prefix}_enter_stake"
     )
 
     builder.button(
-        text="⬅️ | НАЗАД",
+        text="â¬ï¸ | ÐÐÐÐÐ",
         callback_data="games"
     )
 
@@ -348,12 +348,12 @@ def confirm_bet_keyboard(game: str):
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="💎 | ПОДТВЕРДИТЬ СТАВКУ",
+        text="ð | ÐÐÐÐ¢ÐÐÐ ÐÐÐ¢Ð¬ Ð¡Ð¢ÐÐÐÐ£",
         callback_data=f"confirm_{game}"
     )
 
     builder.button(
-        text="✕  ОТМЕНА",
+        text="â  ÐÐ¢ÐÐÐÐ",
         callback_data="games"
     )
 
@@ -366,17 +366,17 @@ def wallet_keyboard():
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="💳  ПОПОЛНИТЬ",
+        text="ð³  ÐÐÐÐÐÐÐÐ¢Ð¬",
         callback_data="deposit"
     )
 
     builder.button(
-        text="💸  ВЫВЕСТИ",
+        text="ð¸  ÐÐ«ÐÐÐ¡Ð¢Ð",
         callback_data="withdraw"
     )
 
     builder.button(
-        text="⬅️  НАЗАД",
+        text="â¬ï¸  ÐÐÐÐÐ",
         callback_data="back_main"
     )
 
@@ -389,17 +389,17 @@ def after_game_keyboard():
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="🔄  ЕЩЁ РАЗ",
+        text="ð  ÐÐ©Ð Ð ÐÐ",
         callback_data="games"
     )
 
     builder.button(
-        text="💰  БАЛАНС",
+        text="ð°  ÐÐÐÐÐÐ¡",
         callback_data="wallet"
     )
 
     builder.button(
-        text="🏠  ГЛАВНОЕ МЕНЮ",
+        text="ð   ÐÐÐÐÐÐÐ ÐÐÐÐ®",
         callback_data="back_main"
     )
 
@@ -414,13 +414,13 @@ def after_game_keyboard():
 
 def slot_symbols_from_value(value: int):
     """
-    Логика Telegram для 🎰.
+    ÐÐ¾Ð³Ð¸ÐºÐ° Telegram Ð´Ð»Ñ ð°.
 
     value == 64:
         777
 
-    Для остальных значений Telegram
-    извлекает три 2-битных значения.
+    ÐÐ»Ñ Ð¾ÑÑÐ°Ð»ÑÐ½ÑÑ Ð·Ð½Ð°ÑÐµÐ½Ð¸Ð¹ Telegram
+    Ð¸Ð·Ð²Ð»ÐµÐºÐ°ÐµÑ ÑÑÐ¸ 2-Ð±Ð¸ÑÐ½ÑÑ Ð·Ð½Ð°ÑÐµÐ½Ð¸Ñ.
 
     raw 0 -> BAR
     raw 1 -> BERRIES
@@ -431,20 +431,20 @@ def slot_symbols_from_value(value: int):
     value = int(value)
 
     if value < 1 or value > 64:
-        return ["❓", "❓", "❓"]
+        return ["â", "â", "â"]
 
     if value == 64:
         return [
-            "7️⃣",
-            "7️⃣",
-            "7️⃣",
+            "7ï¸â£",
+            "7ï¸â£",
+            "7ï¸â£",
         ]
 
     symbols = [
-        "🍸",
-        "🍇",
-        "🍋",
-        "7️⃣",
+        "ð¸",
+        "ð",
+        "ð",
+        "7ï¸â£",
     ]
 
     left_raw = (value - 1) & 0x03
@@ -475,17 +475,17 @@ async def start_handler(message: Message):
     ensure_user(user_id)
 
     text = (
-        "╔══════════════════════╗\n"
-        "      🎰 <b>RESONANT</b>\n"
+        "ââââââââââââââââââââââââ\n"
+        "      ð° <b>RESONANT</b>\n"
         "        <b>CASINO</b>\n"
-        "╚══════════════════════╝\n\n"
-        "💎 <b>VIP GAMING CLUB</b>\n\n"
-        "💰 <b>ДОСТУПНЫЙ БАЛАНС</b>\n"
-        f"<b>{money(get_balance(user_id))} ₽</b>\n\n"
-        "◆ ИГРЫ\n"
-        "◆ СТАВКИ\n"
-        "◆ ВЫИГРЫШИ\n\n"
-        "Выберите действие 👇"
+        "ââââââââââââââââââââââââ\n\n"
+        "ð <b>VIP GAMING CLUB</b>\n\n"
+        "ð° <b>ÐÐÐ¡Ð¢Ð£ÐÐÐ«Ð ÐÐÐÐÐÐ¡</b>\n"
+        f"<b>{money(get_balance(user_id))} â½</b>\n\n"
+        "â ÐÐÐ Ð«\n"
+        "â Ð¡Ð¢ÐÐÐÐ\n"
+        "â ÐÐ«ÐÐÐ Ð«Ð¨Ð\n\n"
+        "ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð´ÐµÐ¹ÑÑÐ²Ð¸Ðµ ð"
     )
 
     await answer_start_screen(
@@ -512,10 +512,10 @@ async def admin_photo_id_handler(
     file_id = message.photo[-1].file_id
 
     await message.answer(
-        "🖼 <b>PHOTO FILE ID</b>\n\n"
+        "ð¼ <b>PHOTO FILE ID</b>\n\n"
         f"<code>{file_id}</code>\n\n"
-        "Скопируйте этот ID и добавьте его "
-        "в соответствующую переменную Render."
+        "Ð¡ÐºÐ¾Ð¿Ð¸ÑÑÐ¹ÑÐµ ÑÑÐ¾Ñ ID Ð¸ Ð´Ð¾Ð±Ð°Ð²ÑÑÐµ ÐµÐ³Ð¾ "
+        "Ð² ÑÐ¾Ð¾ÑÐ²ÐµÑÑÑÐ²ÑÑÑÑÑ Ð¿ÐµÑÐµÐ¼ÐµÐ½Ð½ÑÑ Render."
     )
 
 
@@ -530,14 +530,14 @@ async def back_main(callback: CallbackQuery):
     await callback.answer()
 
     text = (
-        "╔══════════════════════╗\n"
-        "      🎰 <b>RESONANT</b>\n"
+        "ââââââââââââââââââââââââ\n"
+        "      ð° <b>RESONANT</b>\n"
         "        <b>CASINO</b>\n"
-        "╚══════════════════════╝\n\n"
-        "💎 <b>VIP GAMING CLUB</b>\n\n"
-        "💰 <b>ДОСТУПНЫЙ БАЛАНС</b>\n"
-        f"<b>{money(get_balance(user_id))} ₽</b>\n\n"
-        "Выберите действие 👇"
+        "ââââââââââââââââââââââââ\n\n"
+        "ð <b>VIP GAMING CLUB</b>\n\n"
+        "ð° <b>ÐÐÐ¡Ð¢Ð£ÐÐÐ«Ð ÐÐÐÐÐÐ¡</b>\n"
+        f"<b>{money(get_balance(user_id))} â½</b>\n\n"
+        "ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð´ÐµÐ¹ÑÑÐ²Ð¸Ðµ ð"
     )
 
     await edit_or_answer(
@@ -558,12 +558,12 @@ async def games_handler(callback: CallbackQuery):
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       🎰 <b>GAMES</b>\n"
-        "╰────────────────────╯\n\n"
-        "💎 <b>ВЫБЕРИТЕ ИГРУ</b>\n\n"
-        "🎲 Азарт • 🎰 Удача • 🚀 Риск\n\n"
-        "Ставка списывается только после подтверждения.",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð° <b>GAMES</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        "ð <b>ÐÐ«ÐÐÐ ÐÐ¢Ð ÐÐÐ Ð£</b>\n\n"
+        "ð² ÐÐ·Ð°ÑÑ â¢ ð° Ð£Ð´Ð°ÑÐ° â¢ ð Ð Ð¸ÑÐº\n\n"
+        "Ð¡ÑÐ°Ð²ÐºÐ° ÑÐ¿Ð¸ÑÑÐ²Ð°ÐµÑÑÑ ÑÐ¾Ð»ÑÐºÐ¾ Ð¿Ð¾ÑÐ»Ðµ Ð¿Ð¾Ð´ÑÐ²ÐµÑÐ¶Ð´ÐµÐ½Ð¸Ñ.",
         games_keyboard(),
         PHOTO_GAMES
     )
@@ -583,14 +583,14 @@ async def wallet_handler(callback: CallbackQuery):
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       💎 <b>WALLET</b>\n"
-        "╰────────────────────╯\n\n"
-        "💰 <b>ДОСТУПНО</b>\n\n"
-        f"      <b>{money(balance)} ₽</b>\n\n"
-        "◆ Пополняйте баланс\n"
-        "◆ Играйте в мини-игры\n"
-        "◆ Вывод от 80 ₽",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð <b>WALLET</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        "ð° <b>ÐÐÐ¡Ð¢Ð£ÐÐÐ</b>\n\n"
+        f"      <b>{money(balance)} â½</b>\n\n"
+        "â ÐÐ¾Ð¿Ð¾Ð»Ð½ÑÐ¹ÑÐµ Ð±Ð°Ð»Ð°Ð½Ñ\n"
+        "â ÐÐ³ÑÐ°Ð¹ÑÐµ Ð² Ð¼Ð¸Ð½Ð¸-Ð¸Ð³ÑÑ\n"
+        "â ÐÑÐ²Ð¾Ð´ Ð¾Ñ 80 â½",
         wallet_keyboard(),
         PHOTO_WALLET
     )
@@ -619,22 +619,22 @@ async def profile_handler(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="📜  ИСТОРИЯ ИГР",
+        text="ð  ÐÐ¡Ð¢ÐÐ ÐÐ¯ ÐÐÐ ",
         callback_data="my_history"
     )
 
     builder.button(
-        text="💳  ПЛАТЕЖИ",
+        text="ð³  ÐÐÐÐ¢ÐÐÐ",
         callback_data="my_payments"
     )
 
     builder.button(
-        text="💸  МОИ ВЫВОДЫ",
+        text="ð¸  ÐÐÐ ÐÐ«ÐÐÐÐ«",
         callback_data="my_withdrawals"
     )
 
     builder.button(
-        text="⬅️  НАЗАД",
+        text="â¬ï¸  ÐÐÐÐÐ",
         callback_data="back_main"
     )
 
@@ -642,18 +642,18 @@ async def profile_handler(callback: CallbackQuery):
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       👤 <b>PROFILE</b>\n"
-        "╰────────────────────╯\n\n"
-        "💎 <b>BALANCE</b>\n"
-        f"<b>{money(stats['balance'])} ₽</b>\n\n"
-        f"🎮 ИГРЫ        <b>{stats['games_played']}</b>\n"
-        f"🏆 ПОБЕДЫ      <b>{stats['wins']}</b>\n"
-        f"❌ ПОРАЖЕНИЯ   <b>{stats['losses']}</b>\n"
-        f"📈 WINRATE     <b>{winrate}%</b>\n\n"
-        f"💵 СТАВКИ      <b>{money(stats['total_bet'])} ₽</b>\n"
-        f"🏆 ВЫИГРАНО    <b>{money(stats['total_won'])} ₽</b>\n"
-        f"🔥 MAX WIN     <b>{money(stats['biggest_win'])} ₽</b>",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð¤ <b>PROFILE</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        "ð <b>BALANCE</b>\n"
+        f"<b>{money(stats['balance'])} â½</b>\n\n"
+        f"ð® ÐÐÐ Ð«        <b>{stats['games_played']}</b>\n"
+        f"ð ÐÐÐÐÐÐ«      <b>{stats['wins']}</b>\n"
+        f"â ÐÐÐ ÐÐÐÐÐÐ¯   <b>{stats['losses']}</b>\n"
+        f"ð WINRATE     <b>{winrate}%</b>\n\n"
+        f"ðµ Ð¡Ð¢ÐÐÐÐ      <b>{money(stats['total_bet'])} â½</b>\n"
+        f"ð ÐÐ«ÐÐÐ ÐÐÐ    <b>{money(stats['total_won'])} â½</b>\n"
+        f"ð¥ MAX WIN     <b>{money(stats['biggest_win'])} â½</b>",
         builder.as_markup()
     )
 
@@ -672,26 +672,26 @@ async def my_history_handler(callback: CallbackQuery):
 
     if not history:
         text = (
-            "📜 <b>GAME HISTORY</b>\n\n"
-            "Пока игр нет."
+            "ð <b>GAME HISTORY</b>\n\n"
+            "ÐÐ¾ÐºÐ° Ð¸Ð³Ñ Ð½ÐµÑ."
         )
     else:
         lines = [
-            "📜 <b>GAME HISTORY</b>\n"
+            "ð <b>GAME HISTORY</b>\n"
         ]
 
         for item in history:
             result = (
-                "✅"
+                "â"
                 if item["result"] == "win"
-                else "❌"
+                else "â"
             )
 
             lines.append(
                 f"{result} "
-                f"{item['game']} — "
-                f"{money(item['stake'])} ₽ → "
-                f"{money(item['payout'])} ₽"
+                f"{item['game']} â "
+                f"{money(item['stake'])} â½ â "
+                f"{money(item['payout'])} â½"
             )
 
         text = "\n".join(lines)
@@ -699,7 +699,7 @@ async def my_history_handler(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="⬅️  ПРОФИЛЬ",
+        text="â¬ï¸  ÐÐ ÐÐ¤ÐÐÐ¬",
         callback_data="profile"
     )
 
@@ -724,19 +724,19 @@ async def my_payments_handler(callback: CallbackQuery):
 
     if not history:
         text = (
-            "💳 <b>PAYMENTS</b>\n\n"
-            "Платежей пока нет."
+            "ð³ <b>PAYMENTS</b>\n\n"
+            "ÐÐ»Ð°ÑÐµÐ¶ÐµÐ¹ Ð¿Ð¾ÐºÐ° Ð½ÐµÑ."
         )
     else:
         lines = [
-            "💳 <b>PAYMENT HISTORY</b>\n"
+            "ð³ <b>PAYMENT HISTORY</b>\n"
         ]
 
         for item in history:
             lines.append(
-                f"💵 {item['amount_usdt']} USDT → "
-                f"{money(item['amount_rub'])} ₽\n"
-                f"🧾 #{item['invoice_id']}"
+                f"ðµ {item['amount_usdt']} USDT â "
+                f"{money(item['amount_rub'])} â½\n"
+                f"ð§¾ #{item['invoice_id']}"
             )
 
         text = "\n".join(lines)
@@ -744,7 +744,7 @@ async def my_payments_handler(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="⬅️  ПРОФИЛЬ",
+        text="â¬ï¸  ÐÐ ÐÐ¤ÐÐÐ¬",
         callback_data="profile"
     )
 
@@ -767,12 +767,12 @@ async def deposit_handler(callback: CallbackQuery):
 
     for amount in [1, 5, 10, 25, 50, 100]:
         builder.button(
-            text=f"💳  {amount} USDT",
+            text=f"ð³  {amount} USDT",
             callback_data=f"deposit_{amount}"
         )
 
     builder.button(
-        text="⬅️  НАЗАД",
+        text="â¬ï¸  ÐÐÐÐÐ",
         callback_data="wallet"
     )
 
@@ -780,11 +780,11 @@ async def deposit_handler(callback: CallbackQuery):
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       💳 <b>DEPOSIT</b>\n"
-        "╰────────────────────╯\n\n"
-        "Выберите сумму пополнения в USDT.\n\n"
-        "💎 Курс бота: <b>1 USDT = 80 ₽</b>",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð³ <b>DEPOSIT</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        "ÐÑÐ±ÐµÑÐ¸ÑÐµ ÑÑÐ¼Ð¼Ñ Ð¿Ð¾Ð¿Ð¾Ð»Ð½ÐµÐ½Ð¸Ñ Ð² USDT.\n\n"
+        "ð ÐÑÑÑ Ð±Ð¾ÑÐ°: <b>1 USDT = 80 â½</b>",
         builder.as_markup(),
         PHOTO_WALLET
     )
@@ -800,7 +800,7 @@ async def deposit_create_handler(callback: CallbackQuery):
         amount_usdt = float(amount_text)
     except Exception:
         await callback.answer(
-            "Ошибка суммы",
+            "ÐÑÐ¸Ð±ÐºÐ° ÑÑÐ¼Ð¼Ñ",
             show_alert=True
         )
         return
@@ -819,8 +819,8 @@ async def deposit_create_handler(callback: CallbackQuery):
         )
 
         await callback.message.answer(
-            "❌ Не удалось создать счёт.\n"
-            "Попробуйте ещё раз."
+            "â ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ ÑÐ¾Ð·Ð´Ð°ÑÑ ÑÑÑÑ.\n"
+            "ÐÐ¾Ð¿ÑÐ¾Ð±ÑÐ¹ÑÐµ ÐµÑÑ ÑÐ°Ð·."
         )
         return
 
@@ -830,19 +830,19 @@ async def deposit_create_handler(callback: CallbackQuery):
 
     if pay_url:
         builder.button(
-            text="💳  ОПЛАТИТЬ",
+            text="ð³  ÐÐÐÐÐ¢ÐÐ¢Ð¬",
             url=pay_url
         )
 
     builder.button(
-        text="🔄  ПРОВЕРИТЬ ОПЛАТУ",
+        text="ð  ÐÐ ÐÐÐÐ ÐÐ¢Ð¬ ÐÐÐÐÐ¢Ð£",
         callback_data=(
             f"check_payment_{invoice['invoice_id']}"
         )
     )
 
     builder.button(
-        text="⬅️  НАЗАД",
+        text="â¬ï¸  ÐÐÐÐÐ",
         callback_data="wallet"
     )
 
@@ -850,16 +850,16 @@ async def deposit_create_handler(callback: CallbackQuery):
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       💳 <b>INVOICE</b>\n"
-        "╰────────────────────╯\n\n"
-        f"💵 Сумма: <b>{amount_usdt} USDT</b>\n"
-        f"💰 Начисление: "
-        f"<b>{money(int(round(amount_usdt * 80)))} ₽</b>\n\n"
-        f"🧾 Invoice ID: "
+        "â­âââââââââââââââââââââ®\n"
+        "       ð³ <b>INVOICE</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        f"ðµ Ð¡ÑÐ¼Ð¼Ð°: <b>{amount_usdt} USDT</b>\n"
+        f"ð° ÐÐ°ÑÐ¸ÑÐ»ÐµÐ½Ð¸Ðµ: "
+        f"<b>{money(int(round(amount_usdt * 80)))} â½</b>\n\n"
+        f"ð§¾ Invoice ID: "
         f"<code>{invoice['invoice_id']}</code>\n\n"
-        "После оплаты нажмите "
-        "«ПРОВЕРИТЬ ОПЛАТУ».",
+        "ÐÐ¾ÑÐ»Ðµ Ð¾Ð¿Ð»Ð°ÑÑ Ð½Ð°Ð¶Ð¼Ð¸ÑÐµ "
+        "Â«ÐÐ ÐÐÐÐ ÐÐ¢Ð¬ ÐÐÐÐÐ¢Ð£Â».",
         builder.as_markup()
     )
 
@@ -879,7 +879,7 @@ async def check_payment_handler(
     )
 
     await callback.answer(
-        "Проверяю оплату..."
+        "ÐÑÐ¾Ð²ÐµÑÑÑ Ð¾Ð¿Ð»Ð°ÑÑ..."
     )
 
     try:
@@ -893,7 +893,7 @@ async def check_payment_handler(
         )
 
         await callback.message.answer(
-            "❌ Ошибка проверки платежа."
+            "â ÐÑÐ¸Ð±ÐºÐ° Ð¿ÑÐ¾Ð²ÐµÑÐºÐ¸ Ð¿Ð»Ð°ÑÐµÐ¶Ð°."
         )
         return
 
@@ -910,32 +910,32 @@ async def check_payment_handler(
 
         if status == "paid":
             text = (
-                "⚠️ <b>ПЛАТЁЖ УЖЕ ОБРАБОТАН</b>\n\n"
-                "Если баланс не обновился, "
-                "обратитесь к администратору."
+                "â ï¸ <b>ÐÐÐÐ¢ÐÐ Ð£ÐÐ ÐÐÐ ÐÐÐÐ¢ÐÐ</b>\n\n"
+                "ÐÑÐ»Ð¸ Ð±Ð°Ð»Ð°Ð½Ñ Ð½Ðµ Ð¾Ð±Ð½Ð¾Ð²Ð¸Ð»ÑÑ, "
+                "Ð¾Ð±ÑÐ°ÑÐ¸ÑÐµÑÑ Ðº Ð°Ð´Ð¼Ð¸Ð½Ð¸ÑÑÑÐ°ÑÐ¾ÑÑ."
             )
         else:
             text = (
-                "⏳ <b>ОПЛАТА НЕ НАЙДЕНА</b>\n\n"
-                f"Статус: <code>{status}</code>\n\n"
-                "Если вы уже оплатили, "
-                "подождите несколько секунд "
-                "и проверьте снова."
+                "â³ <b>ÐÐÐÐÐ¢Ð ÐÐ ÐÐÐÐÐÐÐ</b>\n\n"
+                f"Ð¡ÑÐ°ÑÑÑ: <code>{status}</code>\n\n"
+                "ÐÑÐ»Ð¸ Ð²Ñ ÑÐ¶Ðµ Ð¾Ð¿Ð»Ð°ÑÐ¸Ð»Ð¸, "
+                "Ð¿Ð¾Ð´Ð¾Ð¶Ð´Ð¸ÑÐµ Ð½ÐµÑÐºÐ¾Ð»ÑÐºÐ¾ ÑÐµÐºÑÐ½Ð´ "
+                "Ð¸ Ð¿ÑÐ¾Ð²ÐµÑÑÑÐµ ÑÐ½Ð¾Ð²Ð°."
             )
 
         await callback.message.answer(text)
         return
 
     await callback.message.answer(
-        "╭────────────────────╮\n"
-        "       💎 <b>PAYMENT OK</b>\n"
-        "╰────────────────────╯\n\n"
-        "✅ <b>ОПЛАТА ПОЛУЧЕНА</b>\n\n"
-        f"💵 {result['amount_usdt']} USDT\n"
-        f"💰 Начислено: "
-        f"<b>{money(result['amount_rub'])} ₽</b>\n"
-        f"💳 Баланс: "
-        f"<b>{money(result['balance'])} ₽</b>",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð <b>PAYMENT OK</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        "â <b>ÐÐÐÐÐ¢Ð ÐÐÐÐ£Ð§ÐÐÐ</b>\n\n"
+        f"ðµ {result['amount_usdt']} USDT\n"
+        f"ð° ÐÐ°ÑÐ¸ÑÐ»ÐµÐ½Ð¾: "
+        f"<b>{money(result['amount_rub'])} â½</b>\n"
+        f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+        f"<b>{money(result['balance'])} â½</b>",
         reply_markup=main_keyboard(
             callback.from_user.id
         )
@@ -947,7 +947,6 @@ async def check_payment_handler(
 
 GAME_STAKE_TYPES = {
     "dice",
-    "two_dice",
     "slots",
     "bowling",
     "roulette",
@@ -960,7 +959,7 @@ def manual_stake_back_keyboard():
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="⬅️  НАЗАД",
+        text="â¬ï¸  ÐÐÐÐÐ",
         callback_data="games"
     )
 
@@ -984,7 +983,7 @@ async def manual_stake_start(
 
     if game_type not in GAME_STAKE_TYPES:
         await callback.answer(
-            "Ошибка игры",
+            "ÐÑÐ¸Ð±ÐºÐ° Ð¸Ð³ÑÑ",
             show_alert=True
         )
         return
@@ -999,27 +998,26 @@ async def manual_stake_start(
     await callback.answer()
 
     game_names = {
-        "dice": "🎲 DICE",
-        "two_dice": "🎲🎲 TWO DICE",
-        "slots": "🎰 SLOTS",
-        "bowling": "🎳 BOWLING",
-        "roulette": "🎡 ROULETTE",
-        "mines": "💣 MINES",
-        "crash": "🚀 CRASH",
+        "dice": "ð² DICE",
+        "slots": "ð° SLOTS",
+        "bowling": "ð³ BOWLING",
+        "roulette": "ð¡ ROULETTE",
+        "mines": "ð£ MINES",
+        "crash": "ð CRASH",
     }
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
+        "â­âââââââââââââââââââââ®\n"
         f"       {game_names[game_type]}\n"
-        "╰────────────────────╯\n\n"
-        "💎 <b>ВВЕДИТЕ СТАВКУ</b>\n\n"
-        "Минимальная ставка: "
-        "<b>50 ₽</b>\n"
-        f"Максимальная ставка: "
-        f"<b>{money(balance)} ₽</b>\n\n"
-        "Отправьте сумму одним сообщением.\n\n"
-        "Например:\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        "ð <b>ÐÐÐÐÐÐ¢Ð Ð¡Ð¢ÐÐÐÐ£</b>\n\n"
+        "ÐÐ¸Ð½Ð¸Ð¼Ð°Ð»ÑÐ½Ð°Ñ ÑÑÐ°Ð²ÐºÐ°: "
+        "<b>50 â½</b>\n"
+        f"ÐÐ°ÐºÑÐ¸Ð¼Ð°Ð»ÑÐ½Ð°Ñ ÑÑÐ°Ð²ÐºÐ°: "
+        f"<b>{money(balance)} â½</b>\n\n"
+        "ÐÑÐ¿ÑÐ°Ð²ÑÑÐµ ÑÑÐ¼Ð¼Ñ Ð¾Ð´Ð½Ð¸Ð¼ ÑÐ¾Ð¾Ð±ÑÐµÐ½Ð¸ÐµÐ¼.\n\n"
+        "ÐÐ°Ð¿ÑÐ¸Ð¼ÐµÑ:\n"
         "<code>350</code>",
         manual_stake_back_keyboard()
     )
@@ -1035,8 +1033,7 @@ async def handle_stake_message(
     game_type = state.get("type")
     allowed_games = {
         "dice",
-        "two_dice",
-        "slots",
+            "slots",
         "bowling",
         "roulette",
         "mines",
@@ -1048,8 +1045,8 @@ async def handle_stake_message(
             None
         )
         await message.answer(
-            "❌ <b>Игра устарела.</b>\n\n"
-            "Выберите игру заново."
+            "â <b>ÐÐ³ÑÐ° ÑÑÑÐ°ÑÐµÐ»Ð°.</b>\n\n"
+            "ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð¸Ð³ÑÑ Ð·Ð°Ð½Ð¾Ð²Ð¾."
         )
         return True
     text = (
@@ -1061,23 +1058,23 @@ async def handle_stake_message(
             raise ValueError
     except (TypeError, ValueError):
         await message.answer(
-            "❌ <b>НЕКОРРЕКТНАЯ СТАВКА</b>\n\n"
-            "Введите целое число не меньше "
-            "<b>50 ₽</b>.\n\n"
-            "Например:\n"
+            "â <b>ÐÐÐÐÐ Ð ÐÐÐ¢ÐÐÐ¯ Ð¡Ð¢ÐÐÐÐ</b>\n\n"
+            "ÐÐ²ÐµÐ´Ð¸ÑÐµ ÑÐµÐ»Ð¾Ðµ ÑÐ¸ÑÐ»Ð¾ Ð½Ðµ Ð¼ÐµÐ½ÑÑÐµ "
+            "<b>50 â½</b>.\n\n"
+            "ÐÐ°Ð¿ÑÐ¸Ð¼ÐµÑ:\n"
             "<code>350</code>"
         )
         return True
     balance = get_balance(user_id)
     if stake > balance:
         await message.answer(
-            "❌ <b>НЕДОСТАТОЧНО СРЕДСТВ</b>\n\n"
-            f"💳 Ваш баланс: "
-            f"<b>{money(balance)} ₽</b>\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "Введите сумму не больше "
-            "текущего баланса."
+            "â <b>ÐÐÐÐÐ¡Ð¢ÐÐ¢ÐÐ§ÐÐ Ð¡Ð ÐÐÐ¡Ð¢Ð</b>\n\n"
+            f"ð³ ÐÐ°Ñ Ð±Ð°Ð»Ð°Ð½Ñ: "
+            f"<b>{money(balance)} â½</b>\n"
+            f"ð Ð¡ÑÐ°Ð²ÐºÐ°: "
+            f"<b>{money(stake)} â½</b>\n\n"
+            "ÐÐ²ÐµÐ´Ð¸ÑÐµ ÑÑÐ¼Ð¼Ñ Ð½Ðµ Ð±Ð¾Ð»ÑÑÐµ "
+            "ÑÐµÐºÑÑÐµÐ³Ð¾ Ð±Ð°Ð»Ð°Ð½ÑÐ°."
         )
         return True
     games[user_id] = {
@@ -1086,78 +1083,80 @@ async def handle_stake_message(
     }
     # DICE
     if game_type == "dice":
+
         builder = InlineKeyboardBuilder()
+
+        # ÐÐ ÐÐ¡ÐÐ 1 Ð ÐÐ
         builder.button(
-            text="⬆️  БОЛЬШЕ 3",
-            callback_data="dice_more"
+            text="x1.85 | ÐÐÐÐ¬Ð¨Ð 4",
+            callback_data="dice_single_less"
         )
+
         builder.button(
-            text="⬇️  МЕНЬШЕ 4",
-            callback_data="dice_less"
+            text="x1.85 | ÐÐÐÐ¬Ð¨Ð 3",
+            callback_data="dice_single_more"
         )
+
+        # ÐÐ ÐÐ¡ÐÐ 2 Ð ÐÐÐ
         builder.button(
-            text="🎯  РОВНО 2",
-            callback_data="dice_two"
+            text="x2.05 | ÐÐÐÐ¬Ð¨Ð 7",
+            callback_data="dice_double_less"
         )
+
         builder.button(
-            text="⬅️  НАЗАД",
+            text="x2.05 | ÐÐÐÐ¬Ð¨Ð 7",
+            callback_data="dice_double_more"
+        )
+
+        builder.button(
+            text="x5 | Ð ÐÐÐÐ 7",
+            callback_data="dice_double_seven"
+        )
+
+        builder.button(
+            text="â¬ï¸  ÐÐÐÐÐ",
             callback_data="game_dice"
         )
+
         builder.adjust(1)
+
         await message.answer(
-            "╭────────────────────╮\n"
-            "       🎲 <b>DICE</b>\n"
-            "╰────────────────────╯\n\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "Выберите прогноз:",
+            "â­âââââââââââââââââââââ®\n"
+            "       ð² <b>| DICE</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            f"ð Ð¡ÑÐ°Ð²ÐºÐ°: "
+            f"<b>{money(stake)} â½</b>\n\n"
+
+            "<b>ÐÐ ÐÐ¡ÐÐ 1 Ð ÐÐ</b>\n"
+            "x1.85 | ÐÐµÐ½ÑÑÐµ 4\n"
+            "x1.85 | ÐÐ¾Ð»ÑÑÐµ 3\n\n"
+
+            "<b>ÐÐ ÐÐ¡ÐÐ 2 Ð ÐÐÐ</b>\n"
+            "x2.05 | ÐÐµÐ½ÑÑÐµ 7\n"
+            "x2.05 | ÐÐ¾Ð»ÑÑÐµ 7\n"
+            "x5 | Ð Ð¾Ð²Ð½Ð¾ 7\n\n"
+
+            "ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð¿ÑÐ¾Ð³Ð½Ð¾Ð·:",
+
             reply_markup=builder.as_markup()
         )
+
         return True
-    # TWO DICE
-    if game_type == "two_dice":
-        builder = InlineKeyboardBuilder()
-        builder.button(
-            text="⬆️  СУММА 8–12",
-            callback_data="two_dice_high"
-        )
-        builder.button(
-            text="⬇️  СУММА 2–6",
-            callback_data="two_dice_low"
-        )
-        builder.button(
-            text="🎯  РОВНО 7",
-            callback_data="two_dice_seven"
-        )
-        builder.button(
-            text="⬅️  НАЗАД",
-            callback_data="game_two_dice"
-        )
-        builder.adjust(1)
-        await message.answer(
-            "╭────────────────────╮\n"
-            "       🎲🎲 <b>TWO DICE</b>\n"
-            "╰────────────────────╯\n\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "Выберите прогноз:",
-            reply_markup=builder.as_markup()
-        )
-        return True
+
     # SLOTS
     if game_type == "slots":
         await message.answer(
-            "╭────────────────────╮\n"
-            "       🎰 <b>SLOTS</b>\n"
-            "╰────────────────────╯\n\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "🍋🍋🍋 — ×10\n"
-            "7️⃣7️⃣7️⃣ — ×50\n"
-            "3 одинаковых — ×3.5\n"
-            "2 одинаковых — ×1.85\n"
-            "Другие комбинации — проигрыш.\n\n"
-            "Подтвердить ставку?",
+            "â­âââââââââââââââââââââ®\n"
+            "       ð° <b>SLOTS</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            f"ð Ð¡ÑÐ°Ð²ÐºÐ°: "
+            f"<b>{money(stake)} â½</b>\n\n"
+            "ððð â Ã10\n"
+            "7ï¸â£7ï¸â£7ï¸â£ â Ã50\n"
+            "3 Ð¾Ð´Ð¸Ð½Ð°ÐºÐ¾Ð²ÑÑ â Ã3.5\n"
+            "2 Ð¾Ð´Ð¸Ð½Ð°ÐºÐ¾Ð²ÑÑ â Ã1.85\n"
+            "ÐÑÑÐ³Ð¸Ðµ ÐºÐ¾Ð¼Ð±Ð¸Ð½Ð°ÑÐ¸Ð¸ â Ð¿ÑÐ¾Ð¸Ð³ÑÑÑ.\n\n"
+            "ÐÐ¾Ð´ÑÐ²ÐµÑÐ´Ð¸ÑÑ ÑÑÐ°Ð²ÐºÑ?",
             reply_markup=confirm_bet_keyboard("slots")
         )
         return True
@@ -1165,25 +1164,25 @@ async def handle_stake_message(
     if game_type == "bowling":
         builder = InlineKeyboardBuilder()
         builder.button(
-            text="🎳  ПОПАЛ",
+            text="ð³  ÐÐÐÐÐ",
             callback_data="bowling_hit"
         )
         builder.button(
-            text="💨  ПРОМАХ",
+            text="ð¨  ÐÐ ÐÐÐÐ¥",
             callback_data="bowling_miss"
         )
         builder.button(
-            text="⬅️  НАЗАД",
+            text="â¬ï¸  ÐÐÐÐÐ",
             callback_data="game_bowling"
         )
         builder.adjust(1)
         await message.answer(
-            "╭────────────────────╮\n"
-            "       🎳 <b>BOWLING</b>\n"
-            "╰────────────────────╯\n\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "Выберите прогноз:",
+            "â­âââââââââââââââââââââ®\n"
+            "       ð³ <b>BOWLING</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            f"ð Ð¡ÑÐ°Ð²ÐºÐ°: "
+            f"<b>{money(stake)} â½</b>\n\n"
+            "ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð¿ÑÐ¾Ð³Ð½Ð¾Ð·:",
             reply_markup=builder.as_markup()
         )
         return True
@@ -1191,56 +1190,56 @@ async def handle_stake_message(
     if game_type == "roulette":
         builder = InlineKeyboardBuilder()
         builder.button(
-            text="🔴  КРАСНОЕ",
+            text="ð´  ÐÐ ÐÐ¡ÐÐÐ",
             callback_data="roulette_red"
         )
         builder.button(
-            text="⚫  ЧЁРНОЕ",
+            text="â«  Ð§ÐÐ ÐÐÐ",
             callback_data="roulette_black"
         )
         builder.button(
-            text="🟢  ZERO",
+            text="ð¢  ZERO",
             callback_data="roulette_zero"
         )
         builder.button(
-            text="⬅️  НАЗАД",
+            text="â¬ï¸  ÐÐÐÐÐ",
             callback_data="game_roulette"
         )
         builder.adjust(1)
         await message.answer(
-            "╭────────────────────╮\n"
-            "       🎡 <b>ROULETTE</b>\n"
-            "╰────────────────────╯\n\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "Выберите цвет:",
+            "â­âââââââââââââââââââââ®\n"
+            "       ð¡ <b>ROULETTE</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            f"ð Ð¡ÑÐ°Ð²ÐºÐ°: "
+            f"<b>{money(stake)} â½</b>\n\n"
+            "ÐÑÐ±ÐµÑÐ¸ÑÐµ ÑÐ²ÐµÑ:",
             reply_markup=builder.as_markup()
         )
         return True
     # MINES
     if game_type == "mines":
         await message.answer(
-            "╭────────────────────╮\n"
-            "       💣 <b>MINES</b>\n"
-            "╰────────────────────╯\n\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "Подтвердить ставку?",
+            "â­âââââââââââââââââââââ®\n"
+            "       ð£ <b>MINES</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            f"ð Ð¡ÑÐ°Ð²ÐºÐ°: "
+            f"<b>{money(stake)} â½</b>\n\n"
+            "ÐÐ¾Ð´ÑÐ²ÐµÑÐ´Ð¸ÑÑ ÑÑÐ°Ð²ÐºÑ?",
             reply_markup=confirm_bet_keyboard("mines")
         )
         return True
     # CRASH
     if game_type == "crash":
         await message.answer(
-            "╭────────────────────╮\n"
-            "       🚀 <b>CRASH</b>\n"
-            "╰────────────────────╯\n\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "Самолёт будет набирать множитель.\n"
-            "Ваша задача — забрать выигрыш "
-            "до CRASH.\n\n"
-            "Подтвердить ставку?",
+            "â­âââââââââââââââââââââ®\n"
+            "       ð <b>CRASH</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            f"ð Ð¡ÑÐ°Ð²ÐºÐ°: "
+            f"<b>{money(stake)} â½</b>\n\n"
+            "Ð¡Ð°Ð¼Ð¾Ð»ÑÑ Ð±ÑÐ´ÐµÑ Ð½Ð°Ð±Ð¸ÑÐ°ÑÑ Ð¼Ð½Ð¾Ð¶Ð¸ÑÐµÐ»Ñ.\n"
+            "ÐÐ°ÑÐ° Ð·Ð°Ð´Ð°ÑÐ° â Ð·Ð°Ð±ÑÐ°ÑÑ Ð²ÑÐ¸Ð³ÑÑÑ "
+            "Ð´Ð¾ CRASH.\n\n"
+            "ÐÐ¾Ð´ÑÐ²ÐµÑÐ´Ð¸ÑÑ ÑÑÐ°Ð²ÐºÑ?",
             reply_markup=confirm_bet_keyboard("crash")
         )
         return True
@@ -1253,10 +1252,10 @@ async def dice_start(
     await callback.answer()
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       🎲 <b>| DICE</b>\n"
-        "╰────────────────────╯\n\n"
-        "Выберите ставку:",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð² <b>| DICE</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        "ÐÑÐ±ÐµÑÐ¸ÑÐµ ÑÑÐ°Ð²ÐºÑ:",
         stake_keyboard("dice")
     )
 @dp.callback_query(
@@ -1274,48 +1273,48 @@ async def dice_stake(
         "stake": stake
     }
     builder = InlineKeyboardBuilder()
-    # БРОСОК 1 РАЗ
+    # ÐÐ ÐÐ¡ÐÐ 1 Ð ÐÐ
     builder.button(
-        text="x1.85 | МЕНЬШЕ 4",
+        text="x1.85 | ÐÐÐÐ¬Ð¨Ð 4",
         callback_data="dice_single_less"
     )
     builder.button(
-        text="x1.85 | БОЛЬШЕ 3",
+        text="x1.85 | ÐÐÐÐ¬Ð¨Ð 3",
         callback_data="dice_single_more"
     )
-    # БРОСОК 2 РАЗА
+    # ÐÐ ÐÐ¡ÐÐ 2 Ð ÐÐÐ
     builder.button(
-        text="x2.05 | МЕНЬШЕ 7",
+        text="x2.05 | ÐÐÐÐ¬Ð¨Ð 7",
         callback_data="dice_double_less"
     )
     builder.button(
-        text="x2.05 | БОЛЬШЕ 7",
+        text="x2.05 | ÐÐÐÐ¬Ð¨Ð 7",
         callback_data="dice_double_more"
     )
     builder.button(
-        text="x5 | РОВНО 7",
+        text="x5 | Ð ÐÐÐÐ 7",
         callback_data="dice_double_seven"
     )
     builder.button(
-        text="⬅️  НАЗАД",
+        text="â¬ï¸  ÐÐÐÐÐ",
         callback_data="game_dice"
     )
     builder.adjust(1)
     await callback.answer()
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       🎲 <b>| DICE</b>\n"
-        "╰────────────────────╯\n\n"
-        f"💎 Ставка: <b>{money(stake)} ₽</b>\n\n"
-        "<b>БРОСОК 1 РАЗ</b>\n"
-        "x1.85 | Меньше 4\n"
-        "x1.85 | Больше 3\n\n"
-        "<b>БРОСОК 2 РАЗА</b>\n"
-        "x2.05 | Меньше 7\n"
-        "x2.05 | Больше 7\n"
-        "x5 | Ровно 7\n\n"
-        "Выберите прогноз:",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð² <b>| DICE</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        f"ð Ð¡ÑÐ°Ð²ÐºÐ°: <b>{money(stake)} â½</b>\n\n"
+        "<b>ÐÐ ÐÐ¡ÐÐ 1 Ð ÐÐ</b>\n"
+        "x1.85 | ÐÐµÐ½ÑÑÐµ 4\n"
+        "x1.85 | ÐÐ¾Ð»ÑÑÐµ 3\n\n"
+        "<b>ÐÐ ÐÐ¡ÐÐ 2 Ð ÐÐÐ</b>\n"
+        "x2.05 | ÐÐµÐ½ÑÑÐµ 7\n"
+        "x2.05 | ÐÐ¾Ð»ÑÑÐµ 7\n"
+        "x5 | Ð Ð¾Ð²Ð½Ð¾ 7\n\n"
+        "ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð¿ÑÐ¾Ð³Ð½Ð¾Ð·:",
         builder.as_markup()
     )
 @dp.callback_query(
@@ -1336,7 +1335,7 @@ async def dice_prediction(
     game = games.get(user_id)
     if not game:
         await callback.answer(
-            "Игра устарела",
+            "ÐÐ³ÑÐ° ÑÑÑÐ°ÑÐµÐ»Ð°",
             show_alert=True
         )
         return
@@ -1345,26 +1344,26 @@ async def dice_prediction(
     stake = game["stake"]
     prediction_names = {
         "dice_single_less":
-            "x1.85 | МЕНЬШЕ 4",
+            "x1.85 | ÐÐÐÐ¬Ð¨Ð 4",
         "dice_single_more":
-            "x1.85 | БОЛЬШЕ 3",
+            "x1.85 | ÐÐÐÐ¬Ð¨Ð 3",
         "dice_double_less":
-            "x2.05 | МЕНЬШЕ 7",
+            "x2.05 | ÐÐÐÐ¬Ð¨Ð 7",
         "dice_double_more":
-            "x2.05 | БОЛЬШЕ 7",
+            "x2.05 | ÐÐÐÐ¬Ð¨Ð 7",
         "dice_double_seven":
-            "x5 | РОВНО 7",
+            "x5 | Ð ÐÐÐÐ 7",
     }
     await callback.answer()
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       🎲 <b>| DICE</b>\n"
-        "╰────────────────────╯\n\n"
-        f"💎 Ставка: <b>{money(stake)} ₽</b>\n"
-        f"🎯 Прогноз: "
+        "â­âââââââââââââââââââââ®\n"
+        "       ð² <b>| DICE</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        f"ð Ð¡ÑÐ°Ð²ÐºÐ°: <b>{money(stake)} â½</b>\n"
+        f"ð¯ ÐÑÐ¾Ð³Ð½Ð¾Ð·: "
         f"<b>{prediction_names[prediction]}</b>\n\n"
-        "Подтвердить ставку?",
+        "ÐÐ¾Ð´ÑÐ²ÐµÑÐ´Ð¸ÑÑ ÑÑÐ°Ð²ÐºÑ?",
         confirm_bet_keyboard("dice")
     )
 @dp.callback_query(
@@ -1377,7 +1376,7 @@ async def confirm_dice(
     game = games.get(user_id)
     if not game:
         await callback.answer(
-            "Игра устарела",
+            "ÐÐ³ÑÐ° ÑÑÑÐ°ÑÐµÐ»Ð°",
             show_alert=True
         )
         return
@@ -1388,20 +1387,20 @@ async def confirm_dice(
         stake
     ):
         await callback.answer(
-            "Недостаточно средств",
+            "ÐÐµÐ´Ð¾ÑÑÐ°ÑÐ¾ÑÐ½Ð¾ ÑÑÐµÐ´ÑÑÐ²",
             show_alert=True
         )
         return
     await callback.answer()
     # =====================================
-    # БРОСОК 1 РАЗ
+    # ÐÐ ÐÐ¡ÐÐ 1 Ð ÐÐ
     # =====================================
     if prediction in {
         "dice_single_less",
         "dice_single_more"
     }:
         dice = await callback.message.answer_dice(
-            emoji="🎲"
+            emoji="ð²"
         )
         await asyncio.sleep(3)
         value = dice.dice.value
@@ -1428,15 +1427,15 @@ async def confirm_dice(
                 payout
             )
             text = (
-                "╭────────────────────╮\n"
-                "       🏆 <b>WIN</b>\n"
-                "╰────────────────────╯\n\n"
-                f"🎲 Выпало: <b>{value}</b>\n\n"
-                "✅ <b>ПОБЕДА</b>\n"
-                f"💰 Выигрыш: "
-                f"<b>+{money(payout)} ₽</b>\n"
-                f"💳 Баланс: "
-                f"<b>{money(get_balance(user_id))} ₽</b>"
+                "â­âââââââââââââââââââââ®\n"
+                "       ð <b>WIN</b>\n"
+                "â°âââââââââââââââââââââ¯\n\n"
+                f"ð² ÐÑÐ¿Ð°Ð»Ð¾: <b>{value}</b>\n\n"
+                "â <b>ÐÐÐÐÐÐ</b>\n"
+                f"ð° ÐÑÐ¸Ð³ÑÑÑ: "
+                f"<b>+{money(payout)} â½</b>\n"
+                f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+                f"<b>{money(get_balance(user_id))} â½</b>"
             )
         else:
             record_game(
@@ -1448,13 +1447,13 @@ async def confirm_dice(
                 0
             )
             text = (
-                "╭────────────────────╮\n"
-                "       💥 <b>LOSS</b>\n"
-                "╰────────────────────╯\n\n"
-                f"🎲 Выпало: <b>{value}</b>\n\n"
-                "❌ <b>ПРОИГРЫШ</b>\n"
-                f"💳 Баланс: "
-                f"<b>{money(get_balance(user_id))} ₽</b>"
+                "â­âââââââââââââââââââââ®\n"
+                "       ð¥ <b>LOSS</b>\n"
+                "â°âââââââââââââââââââââ¯\n\n"
+                f"ð² ÐÑÐ¿Ð°Ð»Ð¾: <b>{value}</b>\n\n"
+                "â <b>ÐÐ ÐÐÐÐ Ð«Ð¨</b>\n"
+                f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+                f"<b>{money(get_balance(user_id))} â½</b>"
             )
         games.pop(
             user_id,
@@ -1466,13 +1465,13 @@ async def confirm_dice(
         )
         return
     # =====================================
-    # БРОСОК 2 РАЗА
+    # ÐÐ ÐÐ¡ÐÐ 2 Ð ÐÐÐ
     # =====================================
     dice1 = await callback.message.answer_dice(
-        emoji="🎲"
+        emoji="ð²"
     )
     dice2 = await callback.message.answer_dice(
-        emoji="🎲"
+        emoji="ð²"
     )
     await asyncio.sleep(3)
     value1 = dice1.dice.value
@@ -1504,16 +1503,16 @@ async def confirm_dice(
             payout
         )
         text = (
-            "╭────────────────────╮\n"
-            "       🏆 <b>WIN</b>\n"
-            "╰────────────────────╯\n\n"
-            f"🎲 {value1} + {value2} = "
+            "â­âââââââââââââââââââââ®\n"
+            "       ð <b>WIN</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            f"ð² {value1} + {value2} = "
             f"<b>{total}</b>\n\n"
-            "✅ <b>ПОБЕДА</b>\n"
-            f"💰 Выигрыш: "
-            f"<b>+{money(payout)} ₽</b>\n"
-            f"💳 Баланс: "
-            f"<b>{money(get_balance(user_id))} ₽</b>"
+            "â <b>ÐÐÐÐÐÐ</b>\n"
+            f"ð° ÐÑÐ¸Ð³ÑÑÑ: "
+            f"<b>+{money(payout)} â½</b>\n"
+            f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+            f"<b>{money(get_balance(user_id))} â½</b>"
         )
     else:
         record_game(
@@ -1525,14 +1524,14 @@ async def confirm_dice(
             0
         )
         text = (
-            "╭────────────────────╮\n"
-            "       💥 <b>LOSS</b>\n"
-            "╰────────────────────╯\n\n"
-            f"🎲 {value1} + {value2} = "
+            "â­âââââââââââââââââââââ®\n"
+            "       ð¥ <b>LOSS</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            f"ð² {value1} + {value2} = "
             f"<b>{total}</b>\n\n"
-            "❌ <b>ПРОИГРЫШ</b>\n"
-            f"💳 Баланс: "
-            f"<b>{money(get_balance(user_id))} ₽</b>"
+            "â <b>ÐÐ ÐÐÐÐ Ð«Ð¨</b>\n"
+            f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+            f"<b>{money(get_balance(user_id))} â½</b>"
         )
     games.pop(
         user_id,
@@ -1556,12 +1555,12 @@ async def slots_start(
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       🎰 <b>SLOTS</b>\n"
-        "╰────────────────────╯\n\n"
-        "Три символа вращаются прямо "
-        "в Telegram.\n\n"
-        "Выберите ставку:",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð° <b>SLOTS</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        "Ð¢ÑÐ¸ ÑÐ¸Ð¼Ð²Ð¾Ð»Ð° Ð²ÑÐ°ÑÐ°ÑÑÑÑ Ð¿ÑÑÐ¼Ð¾ "
+        "Ð² Telegram.\n\n"
+        "ÐÑÐ±ÐµÑÐ¸ÑÐµ ÑÑÐ°Ð²ÐºÑ:",
         stake_keyboard("slots")
     )
 
@@ -1587,14 +1586,14 @@ async def slots_stake(
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       🎰 <b>SLOTS</b>\n"
-        "╰────────────────────╯\n\n"
-        f"💎 Ставка: <b>{money(stake)} ₽</b>\n\n"
-        "🍋🍋🍋 — ×10\n"
-        "7️⃣7️⃣7️⃣ — ×50\n"
-        "Другие комбинации — проигрыш.\n\n"
-        "Подтвердить ставку?",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð° <b>SLOTS</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        f"ð Ð¡ÑÐ°Ð²ÐºÐ°: <b>{money(stake)} â½</b>\n\n"
+        "ððð â Ã10\n"
+        "7ï¸â£7ï¸â£7ï¸â£ â Ã50\n"
+        "ÐÑÑÐ³Ð¸Ðµ ÐºÐ¾Ð¼Ð±Ð¸Ð½Ð°ÑÐ¸Ð¸ â Ð¿ÑÐ¾Ð¸Ð³ÑÑÑ.\n\n"
+        "ÐÐ¾Ð´ÑÐ²ÐµÑÐ´Ð¸ÑÑ ÑÑÐ°Ð²ÐºÑ?",
         confirm_bet_keyboard("slots")
     )
 
@@ -1607,7 +1606,7 @@ async def confirm_slots(
     game = games.get(user_id)
     if not game:
         await callback.answer(
-            "Игра устарела",
+            "ÐÐ³ÑÐ° ÑÑÑÐ°ÑÐµÐ»Ð°",
             show_alert=True
         )
         return
@@ -1617,13 +1616,13 @@ async def confirm_slots(
         stake
     ):
         await callback.answer(
-            "Недостаточно средств",
+            "ÐÐµÐ´Ð¾ÑÑÐ°ÑÐ¾ÑÐ½Ð¾ ÑÑÐµÐ´ÑÑÐ²",
             show_alert=True
         )
         return
     await callback.answer()
     dice = await callback.message.answer_dice(
-        emoji="🎰"
+        emoji="ð°"
     )
     await asyncio.sleep(4)
     value = dice.dice.value
@@ -1636,7 +1635,7 @@ async def confirm_slots(
         }
     )
     display_result = " | ".join(symbols)
-    # 777 — JACKPOT ×50
+    # 777 â JACKPOT Ã50
     if value == 64:
         multiplier = 50
         payout = round(stake * multiplier)
@@ -1653,18 +1652,18 @@ async def confirm_slots(
             payout
         )
         text = (
-            "╔══════════════════════╗\n"
-            "       🔥 <b>JACKPOT</b>\n"
-            "╚══════════════════════╝\n\n"
-            f"🎰 <b>{display_result}</b>\n\n"
-            "🔥 <b>777 — ДЖЕКПОТ!</b>\n\n"
-            f"💰 Выигрыш: "
-            f"<b>+{money(payout)} ₽</b>\n"
-            f"💳 Баланс: "
-            f"<b>{money(get_balance(user_id))} ₽</b>"
+            "ââââââââââââââââââââââââ\n"
+            "       ð¥ <b>JACKPOT</b>\n"
+            "ââââââââââââââââââââââââ\n\n"
+            f"ð° <b>{display_result}</b>\n\n"
+            "ð¥ <b>777 â ÐÐÐÐÐÐÐ¢!</b>\n\n"
+            f"ð° ÐÑÐ¸Ð³ÑÑÑ: "
+            f"<b>+{money(payout)} â½</b>\n"
+            f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+            f"<b>{money(get_balance(user_id))} â½</b>"
         )
-    # 🍋🍋🍋 — ×10
-    elif symbols == ["🍋", "🍋", "🍋"]:
+    # ððð â Ã10
+    elif symbols == ["ð", "ð", "ð"]:
         multiplier = 10
         payout = round(stake * multiplier)
         change_balance(
@@ -1680,17 +1679,17 @@ async def confirm_slots(
             payout
         )
         text = (
-            "╭────────────────────╮\n"
-            "       🍋 <b>WIN</b>\n"
-            "╰────────────────────╯\n\n"
-            f"🎰 <b>{display_result}</b>\n\n"
-            "🍋 <b>ТРИ ЛИМОНА</b>\n\n"
-            f"💰 Выигрыш: "
-            f"<b>+{money(payout)} ₽</b>\n"
-            f"💳 Баланс: "
-            f"<b>{money(get_balance(user_id))} ₽</b>"
+            "â­âââââââââââââââââââââ®\n"
+            "       ð <b>WIN</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            f"ð° <b>{display_result}</b>\n\n"
+            "ð <b>Ð¢Ð Ð ÐÐÐÐÐÐ</b>\n\n"
+            f"ð° ÐÑÐ¸Ð³ÑÑÑ: "
+            f"<b>+{money(payout)} â½</b>\n"
+            f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+            f"<b>{money(get_balance(user_id))} â½</b>"
         )
-    # Любые другие 3 одинаковых — ×3.5
+    # ÐÑÐ±ÑÐµ Ð´ÑÑÐ³Ð¸Ðµ 3 Ð¾Ð´Ð¸Ð½Ð°ÐºÐ¾Ð²ÑÑ â Ã3.5
     elif (
         symbols[0] == symbols[1]
         and symbols[1] == symbols[2]
@@ -1710,18 +1709,18 @@ async def confirm_slots(
             payout
         )
         text = (
-            "╭────────────────────╮\n"
-            "       🎰 <b>WIN</b>\n"
-            "╰────────────────────╯\n\n"
-            f"🎰 <b>{display_result}</b>\n\n"
-            "💎 <b>ТРИ ОДИНАКОВЫХ</b>\n"
-            "×3.5\n\n"
-            f"💰 Выигрыш: "
-            f"<b>+{money(payout)} ₽</b>\n"
-            f"💳 Баланс: "
-            f"<b>{money(get_balance(user_id))} ₽</b>"
+            "â­âââââââââââââââââââââ®\n"
+            "       ð° <b>WIN</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            f"ð° <b>{display_result}</b>\n\n"
+            "ð <b>Ð¢Ð Ð ÐÐÐÐÐÐÐÐÐ«Ð¥</b>\n"
+            "Ã3.5\n\n"
+            f"ð° ÐÑÐ¸Ð³ÑÑÑ: "
+            f"<b>+{money(payout)} â½</b>\n"
+            f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+            f"<b>{money(get_balance(user_id))} â½</b>"
         )
-    # Ровно 2 одинаковых — ×1.85
+    # Ð Ð¾Ð²Ð½Ð¾ 2 Ð¾Ð´Ð¸Ð½Ð°ÐºÐ¾Ð²ÑÑ â Ã1.85
     elif (
         symbols[0] == symbols[1]
         or symbols[0] == symbols[2]
@@ -1742,18 +1741,18 @@ async def confirm_slots(
             payout
         )
         text = (
-            "╭────────────────────╮\n"
-            "       ✨ <b>WIN</b>\n"
-            "╰────────────────────╯\n\n"
-            f"🎰 <b>{display_result}</b>\n\n"
-            "✨ <b>ДВА ОДИНАКОВЫХ</b>\n"
-            "×1.85\n\n"
-            f"💰 Выигрыш: "
-            f"<b>+{money(payout)} ₽</b>\n"
-            f"💳 Баланс: "
-            f"<b>{money(get_balance(user_id))} ₽</b>"
+            "â­âââââââââââââââââââââ®\n"
+            "       â¨ <b>WIN</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            f"ð° <b>{display_result}</b>\n\n"
+            "â¨ <b>ÐÐÐ ÐÐÐÐÐÐÐÐÐ«Ð¥</b>\n"
+            "Ã1.85\n\n"
+            f"ð° ÐÑÐ¸Ð³ÑÑÑ: "
+            f"<b>+{money(payout)} â½</b>\n"
+            f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+            f"<b>{money(get_balance(user_id))} â½</b>"
         )
-    # Остальные комбинации — проигрыш
+    # ÐÑÑÐ°Ð»ÑÐ½ÑÐµ ÐºÐ¾Ð¼Ð±Ð¸Ð½Ð°ÑÐ¸Ð¸ â Ð¿ÑÐ¾Ð¸Ð³ÑÑÑ
     else:
         record_game(
             user_id,
@@ -1764,13 +1763,13 @@ async def confirm_slots(
             0
         )
         text = (
-            "╭────────────────────╮\n"
-            "       💥 <b>LOSS</b>\n"
-            "╰────────────────────╯\n\n"
-            f"🎰 <b>{display_result}</b>\n\n"
-            "❌ <b>ПРОИГРЫШ</b>\n"
-            f"💳 Баланс: "
-            f"<b>{money(get_balance(user_id))} ₽</b>"
+            "â­âââââââââââââââââââââ®\n"
+            "       ð¥ <b>LOSS</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            f"ð° <b>{display_result}</b>\n\n"
+            "â <b>ÐÐ ÐÐÐÐ Ð«Ð¨</b>\n"
+            f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+            f"<b>{money(get_balance(user_id))} â½</b>"
         )
     games.pop(user_id, None)
     await callback.message.answer(
@@ -1791,10 +1790,10 @@ async def bowling_start(
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       🎳 <b>BOWLING</b>\n"
-        "╰────────────────────╯\n\n"
-        "Выберите ставку:",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð³ <b>BOWLING</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        "ÐÑÐ±ÐµÑÐ¸ÑÐµ ÑÑÐ°Ð²ÐºÑ:",
         stake_keyboard("bowling")
     )
 
@@ -1819,17 +1818,17 @@ async def bowling_stake(
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="🎳  ПОПАЛ",
+        text="ð³  ÐÐÐÐÐ",
         callback_data="bowling_hit"
     )
 
     builder.button(
-        text="💨  ПРОМАХ",
+        text="ð¨  ÐÐ ÐÐÐÐ¥",
         callback_data="bowling_miss"
     )
 
     builder.button(
-        text="⬅️  НАЗАД",
+        text="â¬ï¸  ÐÐÐÐÐ",
         callback_data="game_bowling"
     )
 
@@ -1839,9 +1838,9 @@ async def bowling_stake(
 
     await edit_or_answer(
         callback,
-        f"🎳 <b>BOWLING</b>\n\n"
-        f"💎 Ставка: <b>{money(stake)} ₽</b>\n\n"
-        "Выберите прогноз:",
+        f"ð³ <b>BOWLING</b>\n\n"
+        f"ð Ð¡ÑÐ°Ð²ÐºÐ°: <b>{money(stake)} â½</b>\n\n"
+        "ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð¿ÑÐ¾Ð³Ð½Ð¾Ð·:",
         builder.as_markup()
     )
 
@@ -1863,7 +1862,7 @@ async def bowling_prediction(
 
     if not game:
         await callback.answer(
-            "Игра устарела",
+            "ÐÐ³ÑÐ° ÑÑÑÐ°ÑÐµÐ»Ð°",
             show_alert=True
         )
         return
@@ -1877,11 +1876,11 @@ async def bowling_prediction(
 
     await edit_or_answer(
         callback,
-        f"🎳 <b>BOWLING</b>\n\n"
-        f"💎 Ставка: "
-        f"<b>{money(game['stake'])} ₽</b>\n"
-        f"🎯 Прогноз: <b>{game['prediction']}</b>\n\n"
-        "Подтвердить?",
+        f"ð³ <b>BOWLING</b>\n\n"
+        f"ð Ð¡ÑÐ°Ð²ÐºÐ°: "
+        f"<b>{money(game['stake'])} â½</b>\n"
+        f"ð¯ ÐÑÐ¾Ð³Ð½Ð¾Ð·: <b>{game['prediction']}</b>\n\n"
+        "ÐÐ¾Ð´ÑÐ²ÐµÑÐ´Ð¸ÑÑ?",
         confirm_bet_keyboard("bowling")
     )
 
@@ -1896,7 +1895,7 @@ async def confirm_bowling(
 
     if not game:
         await callback.answer(
-            "Игра устарела",
+            "ÐÐ³ÑÐ° ÑÑÑÐ°ÑÐµÐ»Ð°",
             show_alert=True
         )
         return
@@ -1908,7 +1907,7 @@ async def confirm_bowling(
         stake
     ):
         await callback.answer(
-            "Недостаточно средств",
+            "ÐÐµÐ´Ð¾ÑÑÐ°ÑÐ¾ÑÐ½Ð¾ ÑÑÐµÐ´ÑÑÐ²",
             show_alert=True
         )
         return
@@ -1916,7 +1915,7 @@ async def confirm_bowling(
     await callback.answer()
 
     dice = await callback.message.answer_dice(
-        emoji="🎳"
+        emoji="ð³"
     )
 
     await asyncio.sleep(3)
@@ -1950,14 +1949,14 @@ async def confirm_bowling(
         )
 
         text = (
-            "╭────────────────────╮\n"
-            "       🏆 <b>WIN</b>\n"
-            "╰────────────────────╯\n\n"
-            f"🎳 Результат: <b>{value}</b>\n\n"
-            "✅ <b>ПОБЕДА</b>\n"
-            f"💰 +{money(payout)} ₽\n"
-            f"💳 Баланс: "
-            f"<b>{money(get_balance(user_id))} ₽</b>"
+            "â­âââââââââââââââââââââ®\n"
+            "       ð <b>WIN</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            f"ð³ Ð ÐµÐ·ÑÐ»ÑÑÐ°Ñ: <b>{value}</b>\n\n"
+            "â <b>ÐÐÐÐÐÐ</b>\n"
+            f"ð° +{money(payout)} â½\n"
+            f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+            f"<b>{money(get_balance(user_id))} â½</b>"
         )
 
     else:
@@ -1971,13 +1970,13 @@ async def confirm_bowling(
         )
 
         text = (
-            "╭────────────────────╮\n"
-            "       💥 <b>LOSS</b>\n"
-            "╰────────────────────╯\n\n"
-            f"🎳 Результат: <b>{value}</b>\n\n"
-            "❌ <b>ПРОИГРЫШ</b>\n"
-            f"💳 Баланс: "
-            f"<b>{money(get_balance(user_id))} ₽</b>"
+            "â­âââââââââââââââââââââ®\n"
+            "       ð¥ <b>LOSS</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            f"ð³ Ð ÐµÐ·ÑÐ»ÑÑÐ°Ñ: <b>{value}</b>\n\n"
+            "â <b>ÐÐ ÐÐÐÐ Ð«Ð¨</b>\n"
+            f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+            f"<b>{money(get_balance(user_id))} â½</b>"
         )
 
     games.pop(user_id, None)
@@ -2000,10 +1999,10 @@ async def roulette_start(
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       🎡 <b>ROULETTE</b>\n"
-        "╰────────────────────╯\n\n"
-        "Выберите ставку:",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð¡ <b>ROULETTE</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        "ÐÑÐ±ÐµÑÐ¸ÑÐµ ÑÑÐ°Ð²ÐºÑ:",
         stake_keyboard("roulette"),
         PHOTO_ROULETTE
     )
@@ -2029,22 +2028,22 @@ async def roulette_stake(
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="🔴  КРАСНОЕ",
+        text="ð´  ÐÐ ÐÐ¡ÐÐÐ",
         callback_data="roulette_red"
     )
 
     builder.button(
-        text="⚫  ЧЁРНОЕ",
+        text="â«  Ð§ÐÐ ÐÐÐ",
         callback_data="roulette_black"
     )
 
     builder.button(
-        text="🟢  ZERO",
+        text="ð¢  ZERO",
         callback_data="roulette_zero"
     )
 
     builder.button(
-        text="⬅️  НАЗАД",
+        text="â¬ï¸  ÐÐÐÐÐ",
         callback_data="game_roulette"
     )
 
@@ -2054,10 +2053,10 @@ async def roulette_stake(
 
     await edit_or_answer(
         callback,
-        f"🎡 <b>ROULETTE</b>\n\n"
-        f"💎 Ставка: "
-        f"<b>{money(stake)} ₽</b>\n\n"
-        "Выберите цвет:",
+        f"ð¡ <b>ROULETTE</b>\n\n"
+        f"ð Ð¡ÑÐ°Ð²ÐºÐ°: "
+        f"<b>{money(stake)} â½</b>\n\n"
+        "ÐÑÐ±ÐµÑÐ¸ÑÐµ ÑÐ²ÐµÑ:",
         builder.as_markup()
     )
 
@@ -2080,7 +2079,7 @@ async def roulette_color(
 
     if not game:
         await callback.answer(
-            "Игра устарела",
+            "ÐÐ³ÑÐ° ÑÑÑÐ°ÑÐµÐ»Ð°",
             show_alert=True
         )
         return
@@ -2094,11 +2093,11 @@ async def roulette_color(
 
     await edit_or_answer(
         callback,
-        f"🎡 <b>ROULETTE</b>\n\n"
-        f"💎 Ставка: "
-        f"<b>{money(game['stake'])} ₽</b>\n"
-        f"🎯 Выбор: <b>{game['color']}</b>\n\n"
-        "Подтвердить?",
+        f"ð¡ <b>ROULETTE</b>\n\n"
+        f"ð Ð¡ÑÐ°Ð²ÐºÐ°: "
+        f"<b>{money(game['stake'])} â½</b>\n"
+        f"ð¯ ÐÑÐ±Ð¾Ñ: <b>{game['color']}</b>\n\n"
+        "ÐÐ¾Ð´ÑÐ²ÐµÑÐ´Ð¸ÑÑ?",
         confirm_bet_keyboard("roulette")
     )
 
@@ -2113,7 +2112,7 @@ async def confirm_roulette(
 
     if not game:
         await callback.answer(
-            "Игра устарела",
+            "ÐÐ³ÑÐ° ÑÑÑÐ°ÑÐµÐ»Ð°",
             show_alert=True
         )
         return
@@ -2125,7 +2124,7 @@ async def confirm_roulette(
         stake
     ):
         await callback.answer(
-            "Недостаточно средств",
+            "ÐÐµÐ´Ð¾ÑÑÐ°ÑÐ¾ÑÐ½Ð¾ ÑÑÐµÐ´ÑÑÐ²",
             show_alert=True
         )
         return
@@ -2135,11 +2134,11 @@ async def confirm_roulette(
     message = callback.message
 
     animation = [
-        "🎡 🔴 ⚫ 🟢 ⚫ 🔴",
-        "🎡 ⚫ 🔴 ⚫ 🟢 🔴",
-        "🎡 🔴 🟢 ⚫ 🔴 ⚫",
-        "🎡 ⚫ 🔴 🟢 ⚫ 🔴",
-        "🎡 🔴 ⚫ 🔴 🟢 ⚫",
+        "ð¡ ð´ â« ð¢ â« ð´",
+        "ð¡ â« ð´ â« ð¢ ð´",
+        "ð¡ ð´ ð¢ â« ð´ â«",
+        "ð¡ â« ð´ ð¢ â« ð´",
+        "ð¡ ð´ â« ð´ ð¢ â«",
     ]
 
     for frame in animation:
@@ -2197,23 +2196,23 @@ async def confirm_roulette(
         )
 
         emoji = (
-            "🟢"
+            "ð¢"
             if result_color == "zero"
-            else "🔴"
+            else "ð´"
             if result_color == "red"
-            else "⚫"
+            else "â«"
         )
 
         text = (
-            "╭────────────────────╮\n"
-            "       🏆 <b>WIN</b>\n"
-            "╰────────────────────╯\n\n"
-            f"🎡 Выпало: <b>{number}</b> "
+            "â­âââââââââââââââââââââ®\n"
+            "       ð <b>WIN</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            f"ð¡ ÐÑÐ¿Ð°Ð»Ð¾: <b>{number}</b> "
             f"{emoji}\n\n"
-            "✅ <b>ПОБЕДА</b>\n"
-            f"💰 +{money(payout)} ₽\n"
-            f"💳 Баланс: "
-            f"<b>{money(get_balance(user_id))} ₽</b>"
+            "â <b>ÐÐÐÐÐÐ</b>\n"
+            f"ð° +{money(payout)} â½\n"
+            f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+            f"<b>{money(get_balance(user_id))} â½</b>"
         )
 
     else:
@@ -2227,13 +2226,13 @@ async def confirm_roulette(
         )
 
         text = (
-            "╭────────────────────╮\n"
-            "       💥 <b>LOSS</b>\n"
-            "╰────────────────────╯\n\n"
-            f"🎡 Выпало: <b>{number}</b>\n\n"
-            "❌ <b>ПРОИГРЫШ</b>\n"
-            f"💳 Баланс: "
-            f"<b>{money(get_balance(user_id))} ₽</b>"
+            "â­âââââââââââââââââââââ®\n"
+            "       ð¥ <b>LOSS</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            f"ð¡ ÐÑÐ¿Ð°Ð»Ð¾: <b>{number}</b>\n\n"
+            "â <b>ÐÐ ÐÐÐÐ Ð«Ð¨</b>\n"
+            f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+            f"<b>{money(get_balance(user_id))} â½</b>"
         )
 
     games.pop(user_id, None)
@@ -2256,12 +2255,12 @@ async def mines_start(
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       💣 <b>MINES</b>\n"
-        "╰────────────────────╯\n\n"
-        "На поле 9 клеток.\n"
-        "2 из них — мины.\n\n"
-        "Выберите ставку:",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð£ <b>MINES</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        "ÐÐ° Ð¿Ð¾Ð»Ðµ 9 ÐºÐ»ÐµÑÐ¾Ðº.\n"
+        "2 Ð¸Ð· Ð½Ð¸Ñ â Ð¼Ð¸Ð½Ñ.\n\n"
+        "ÐÑÐ±ÐµÑÐ¸ÑÐµ ÑÑÐ°Ð²ÐºÑ:",
         stake_keyboard("mines"),
         PHOTO_MINES
     )
@@ -2288,11 +2287,11 @@ async def mines_stake(
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       💣 <b>MINES</b>\n"
-        "╰────────────────────╯\n\n"
-        f"💎 Ставка: <b>{money(stake)} ₽</b>\n\n"
-        "Подтвердить ставку?",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð£ <b>MINES</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        f"ð Ð¡ÑÐ°Ð²ÐºÐ°: <b>{money(stake)} â½</b>\n\n"
+        "ÐÐ¾Ð´ÑÐ²ÐµÑÐ´Ð¸ÑÑ ÑÑÐ°Ð²ÐºÑ?",
         confirm_bet_keyboard("mines")
     )
 
@@ -2310,9 +2309,9 @@ def mines_keyboard(user_id: int):
 
     for i in range(9):
         text = (
-            "💎"
+            "ð"
             if i in opened
-            else "⬜"
+            else "â¬"
         )
 
         builder.button(
@@ -2321,7 +2320,7 @@ def mines_keyboard(user_id: int):
         )
 
     builder.button(
-        text="💰  ЗАБРАТЬ",
+        text="ð°  ÐÐÐÐ ÐÐ¢Ð¬",
         callback_data="mine_cashout"
     )
 
@@ -2340,7 +2339,7 @@ async def confirm_mines(
 
     if not game:
         await callback.answer(
-            "Игра устарела",
+            "ÐÐ³ÑÐ° ÑÑÑÐ°ÑÐµÐ»Ð°",
             show_alert=True
         )
         return
@@ -2352,7 +2351,7 @@ async def confirm_mines(
         stake
     ):
         await callback.answer(
-            "Недостаточно средств",
+            "ÐÐµÐ´Ð¾ÑÑÐ°ÑÐ¾ÑÐ½Ð¾ ÑÑÐµÐ´ÑÑÐ²",
             show_alert=True
         )
         return
@@ -2370,11 +2369,11 @@ async def confirm_mines(
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       💣 <b>MINES</b>\n"
-        "╰────────────────────╯\n\n"
-        f"💎 Ставка: <b>{money(stake)} ₽</b>\n"
-        "💎 Открывайте клетки 👇",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð£ <b>MINES</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        f"ð Ð¡ÑÐ°Ð²ÐºÐ°: <b>{money(stake)} â½</b>\n"
+        "ð ÐÑÐºÑÑÐ²Ð°Ð¹ÑÐµ ÐºÐ»ÐµÑÐºÐ¸ ð",
         mines_keyboard(user_id)
     )
 
@@ -2389,7 +2388,7 @@ async def mine_click(
 
     if not game:
         await callback.answer(
-            "Игра устарела",
+            "ÐÐ³ÑÐ° ÑÑÑÐ°ÑÐµÐ»Ð°",
             show_alert=True
         )
         return
@@ -2429,16 +2428,16 @@ async def mine_click(
 
         await edit_or_answer(
             callback,
-            "╭────────────────────╮\n"
-            "       💎 <b>MINES</b>\n"
-            "╰────────────────────╯\n\n"
-            "💰 <b>ВЫ ЗАБРАЛИ ВЫИГРЫШ</b>\n\n"
-            f"📈 Множитель: "
+            "â­âââââââââââââââââââââ®\n"
+            "       ð <b>MINES</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            "ð° <b>ÐÐ« ÐÐÐÐ ÐÐÐ ÐÐ«ÐÐÐ Ð«Ð¨</b>\n\n"
+            f"ð ÐÐ½Ð¾Ð¶Ð¸ÑÐµÐ»Ñ: "
             f"<b>x{multiplier:.2f}</b>\n"
-            f"💵 Выигрыш: "
-            f"<b>{money(payout)} ₽</b>\n"
-            f"💳 Баланс: "
-            f"<b>{money(get_balance(user_id))} ₽</b>",
+            f"ðµ ÐÑÐ¸Ð³ÑÑÑ: "
+            f"<b>{money(payout)} â½</b>\n"
+            f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+            f"<b>{money(get_balance(user_id))} â½</b>",
             after_game_keyboard()
         )
 
@@ -2448,7 +2447,7 @@ async def mine_click(
 
     if index in game["opened"]:
         await callback.answer(
-            "Эта клетка уже открыта"
+            "Ð­ÑÐ° ÐºÐ»ÐµÑÐºÐ° ÑÐ¶Ðµ Ð¾ÑÐºÑÑÑÐ°"
         )
         return
 
@@ -2470,19 +2469,19 @@ async def mine_click(
         )
 
         await callback.answer(
-            "💥 БУМ!",
+            "ð¥ ÐÐ£Ð!",
             show_alert=True
         )
 
         await edit_or_answer(
             callback,
-            "╭────────────────────╮\n"
-            "       💥 <b>MINES</b>\n"
-            "╰────────────────────╯\n\n"
-            "💣 <b>МИНА!</b>\n\n"
-            "❌ Ты проиграл.\n\n"
-            f"💳 Баланс: "
-            f"<b>{money(get_balance(user_id))} ₽</b>",
+            "â­âââââââââââââââââââââ®\n"
+            "       ð¥ <b>MINES</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            "ð£ <b>ÐÐÐÐ!</b>\n\n"
+            "â Ð¢Ñ Ð¿ÑÐ¾Ð¸Ð³ÑÐ°Ð».\n\n"
+            f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+            f"<b>{money(get_balance(user_id))} â½</b>",
             after_game_keyboard()
         )
 
@@ -2493,18 +2492,18 @@ async def mine_click(
     game["multiplier"] += 0.35
 
     await callback.answer(
-        f"💎 x{game['multiplier']:.2f}"
+        f"ð x{game['multiplier']:.2f}"
     )
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       💣 <b>MINES</b>\n"
-        "╰────────────────────╯\n\n"
-        f"📈 Множитель: "
+        "â­âââââââââââââââââââââ®\n"
+        "       ð£ <b>MINES</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        f"ð ÐÐ½Ð¾Ð¶Ð¸ÑÐµÐ»Ñ: "
         f"<b>x{game['multiplier']:.2f}</b>\n"
-        f"💰 Забрать: "
-        f"<b>{money(int(game['stake'] * game['multiplier']))} ₽</b>",
+        f"ð° ÐÐ°Ð±ÑÐ°ÑÑ: "
+        f"<b>{money(int(game['stake'] * game['multiplier']))} â½</b>",
         mines_keyboard(user_id)
     )
 
@@ -2521,13 +2520,13 @@ async def crash_start(
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       🚀 <b>CRASH</b>\n"
-        "╰────────────────────╯\n\n"
-        "Множитель растёт каждую секунду.\n"
-        "Нажмите «💰 ЗАБРАТЬ», "
-        "пока самолёт не разбился.\n\n"
-        "Выберите ставку:",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð <b>CRASH</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        "ÐÐ½Ð¾Ð¶Ð¸ÑÐµÐ»Ñ ÑÐ°ÑÑÑÑ ÐºÐ°Ð¶Ð´ÑÑ ÑÐµÐºÑÐ½Ð´Ñ.\n"
+        "ÐÐ°Ð¶Ð¼Ð¸ÑÐµ Â«ð° ÐÐÐÐ ÐÐ¢Ð¬Â», "
+        "Ð¿Ð¾ÐºÐ° ÑÐ°Ð¼Ð¾Ð»ÑÑ Ð½Ðµ ÑÐ°Ð·Ð±Ð¸Ð»ÑÑ.\n\n"
+        "ÐÑÐ±ÐµÑÐ¸ÑÐµ ÑÑÐ°Ð²ÐºÑ:",
         stake_keyboard("crash"),
         PHOTO_CRASH
     )
@@ -2554,15 +2553,15 @@ async def crash_stake(
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       🚀 <b>CRASH</b>\n"
-        "╰────────────────────╯\n\n"
-        f"💎 Ставка: "
-        f"<b>{money(stake)} ₽</b>\n\n"
-        "Самолёт будет набирать множитель.\n"
-        "Ваша задача — забрать выигрыш "
-        "до CRASH.\n\n"
-        "Подтвердить ставку?",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð <b>CRASH</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        f"ð Ð¡ÑÐ°Ð²ÐºÐ°: "
+        f"<b>{money(stake)} â½</b>\n\n"
+        "Ð¡Ð°Ð¼Ð¾Ð»ÑÑ Ð±ÑÐ´ÐµÑ Ð½Ð°Ð±Ð¸ÑÐ°ÑÑ Ð¼Ð½Ð¾Ð¶Ð¸ÑÐµÐ»Ñ.\n"
+        "ÐÐ°ÑÐ° Ð·Ð°Ð´Ð°ÑÐ° â Ð·Ð°Ð±ÑÐ°ÑÑ Ð²ÑÐ¸Ð³ÑÑÑ "
+        "Ð´Ð¾ CRASH.\n\n"
+        "ÐÐ¾Ð´ÑÐ²ÐµÑÐ´Ð¸ÑÑ ÑÑÐ°Ð²ÐºÑ?",
         confirm_bet_keyboard("crash")
     )
 
@@ -2571,12 +2570,12 @@ def crash_keyboard(multiplier: float):
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text=f"💰  ЗАБРАТЬ x{multiplier:.2f}",
+        text=f"ð°  ÐÐÐÐ ÐÐ¢Ð¬ x{multiplier:.2f}",
         callback_data="crash_cashout"
     )
 
     builder.button(
-        text="❌  СДАТЬСЯ",
+        text="â  Ð¡ÐÐÐ¢Ð¬Ð¡Ð¯",
         callback_data="crash_giveup"
     )
 
@@ -2616,13 +2615,13 @@ async def run_crash_game(
 
             try:
                 await message.edit_text(
-                    "╭────────────────────╮\n"
-                    "       🚀 <b>CRASH</b>\n"
-                    "╰────────────────────╯\n\n"
-                    "✈️ Самолёт летит...\n\n"
-                    f"📈 Множитель: "
+                    "â­âââââââââââââââââââââ®\n"
+                    "       ð <b>CRASH</b>\n"
+                    "â°âââââââââââââââââââââ¯\n\n"
+                    "âï¸ Ð¡Ð°Ð¼Ð¾Ð»ÑÑ Ð»ÐµÑÐ¸Ñ...\n\n"
+                    f"ð ÐÐ½Ð¾Ð¶Ð¸ÑÐµÐ»Ñ: "
                     f"<b>x{multiplier:.2f}</b>\n\n"
-                    "💰 Успейте забрать выигрыш!",
+                    "ð° Ð£ÑÐ¿ÐµÐ¹ÑÐµ Ð·Ð°Ð±ÑÐ°ÑÑ Ð²ÑÐ¸Ð³ÑÑÑ!",
                     reply_markup=crash_keyboard(
                         multiplier
                     )
@@ -2680,15 +2679,15 @@ async def run_crash_game(
 
         try:
             await message.edit_text(
-                "╭────────────────────╮\n"
-                "       💥 <b>CRASH</b>\n"
-                "╰────────────────────╯\n\n"
-                f"📈 Самолёт разбился на "
+                "â­âââââââââââââââââââââ®\n"
+                "       ð¥ <b>CRASH</b>\n"
+                "â°âââââââââââââââââââââ¯\n\n"
+                f"ð Ð¡Ð°Ð¼Ð¾Ð»ÑÑ ÑÐ°Ð·Ð±Ð¸Ð»ÑÑ Ð½Ð° "
                 f"<b>x{crash_point:.2f}</b>\n\n"
-                "❌ <b>Слишком поздно.</b>\n"
-                "Ставка проиграна.\n\n"
-                f"💳 Баланс: "
-                f"<b>{money(get_balance(user_id))} ₽</b>",
+                "â <b>Ð¡Ð»Ð¸ÑÐºÐ¾Ð¼ Ð¿Ð¾Ð·Ð´Ð½Ð¾.</b>\n"
+                "Ð¡ÑÐ°Ð²ÐºÐ° Ð¿ÑÐ¾Ð¸Ð³ÑÐ°Ð½Ð°.\n\n"
+                f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+                f"<b>{money(get_balance(user_id))} â½</b>",
                 reply_markup=after_game_keyboard()
             )
         except Exception as error:
@@ -2721,7 +2720,7 @@ async def confirm_crash(
 
     if not game:
         await callback.answer(
-            "Игра устарела",
+            "ÐÐ³ÑÐ° ÑÑÑÐ°ÑÐµÐ»Ð°",
             show_alert=True
         )
         return
@@ -2733,7 +2732,7 @@ async def confirm_crash(
         stake
     ):
         await callback.answer(
-            "Недостаточно средств",
+            "ÐÐµÐ´Ð¾ÑÑÐ°ÑÐ¾ÑÐ½Ð¾ ÑÑÐµÐ´ÑÑÐ²",
             show_alert=True
         )
         return
@@ -2752,16 +2751,16 @@ async def confirm_crash(
     game["crash_finished"] = False
 
     await callback.answer(
-        "🚀 CRASH НАЧАЛСЯ!"
+        "ð CRASH ÐÐÐ§ÐÐÐ¡Ð¯!"
     )
 
     message = await callback.message.answer(
-        "╭────────────────────╮\n"
-        "       🚀 <b>CRASH</b>\n"
-        "╰────────────────────╯\n\n"
-        "✈️ Самолёт взлетел!\n\n"
-        "📈 Множитель: <b>x1.00</b>\n\n"
-        "💰 Успейте забрать выигрыш!",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð <b>CRASH</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        "âï¸ Ð¡Ð°Ð¼Ð¾Ð»ÑÑ Ð²Ð·Ð»ÐµÑÐµÐ»!\n\n"
+        "ð ÐÐ½Ð¾Ð¶Ð¸ÑÐµÐ»Ñ: <b>x1.00</b>\n\n"
+        "ð° Ð£ÑÐ¿ÐµÐ¹ÑÐµ Ð·Ð°Ð±ÑÐ°ÑÑ Ð²ÑÐ¸Ð³ÑÑÑ!",
         reply_markup=crash_keyboard(1.00)
     )
 
@@ -2786,14 +2785,14 @@ async def crash_cashout(
 
     if not game:
         await callback.answer(
-            "💥 CRASH уже произошёл.",
+            "ð¥ CRASH ÑÐ¶Ðµ Ð¿ÑÐ¾Ð¸Ð·Ð¾ÑÑÐ».",
             show_alert=True
         )
         return
 
     if game.get("crash_finished"):
         await callback.answer(
-            "💥 Слишком поздно!",
+            "ð¥ Ð¡Ð»Ð¸ÑÐºÐ¾Ð¼ Ð¿Ð¾Ð·Ð´Ð½Ð¾!",
             show_alert=True
         )
         return
@@ -2842,21 +2841,21 @@ async def crash_cashout(
     )
 
     await callback.answer(
-        "💰 Выигрыш забран!"
+        "ð° ÐÑÐ¸Ð³ÑÑÑ Ð·Ð°Ð±ÑÐ°Ð½!"
     )
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       🚀 <b>CRASH</b>\n"
-        "╰────────────────────╯\n\n"
-        "💰 <b>ВЫ ЗАБРАЛИ ВЫИГРЫШ</b>\n\n"
-        f"📈 Множитель: "
+        "â­âââââââââââââââââââââ®\n"
+        "       ð <b>CRASH</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        "ð° <b>ÐÐ« ÐÐÐÐ ÐÐÐ ÐÐ«ÐÐÐ Ð«Ð¨</b>\n\n"
+        f"ð ÐÐ½Ð¾Ð¶Ð¸ÑÐµÐ»Ñ: "
         f"<b>x{multiplier:.2f}</b>\n"
-        f"💵 Выигрыш: "
-        f"<b>{money(payout)} ₽</b>\n"
-        f"💳 Баланс: "
-        f"<b>{money(get_balance(user_id))} ₽</b>",
+        f"ðµ ÐÑÐ¸Ð³ÑÑÑ: "
+        f"<b>{money(payout)} â½</b>\n"
+        f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+        f"<b>{money(get_balance(user_id))} â½</b>",
         after_game_keyboard()
     )
 
@@ -2871,7 +2870,7 @@ async def crash_giveup(
 
     if not game:
         await callback.answer(
-            "Игра уже завершена.",
+            "ÐÐ³ÑÐ° ÑÐ¶Ðµ Ð·Ð°Ð²ÐµÑÑÐµÐ½Ð°.",
             show_alert=True
         )
         return
@@ -2898,18 +2897,18 @@ async def crash_giveup(
     )
 
     await callback.answer(
-        "Ставка завершена."
+        "Ð¡ÑÐ°Ð²ÐºÐ° Ð·Ð°Ð²ÐµÑÑÐµÐ½Ð°."
     )
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       🚀 <b>CRASH</b>\n"
-        "╰────────────────────╯\n\n"
-        "❌ Ты остановил игру.\n"
-        "Ставка проиграна.\n\n"
-        f"💳 Баланс: "
-        f"<b>{money(get_balance(user_id))} ₽</b>",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð <b>CRASH</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        "â Ð¢Ñ Ð¾ÑÑÐ°Ð½Ð¾Ð²Ð¸Ð» Ð¸Ð³ÑÑ.\n"
+        "Ð¡ÑÐ°Ð²ÐºÐ° Ð¿ÑÐ¾Ð¸Ð³ÑÐ°Ð½Ð°.\n\n"
+        f"ð³ ÐÐ°Ð»Ð°Ð½Ñ: "
+        f"<b>{money(get_balance(user_id))} â½</b>",
         after_game_keyboard()
     )
 
@@ -2922,7 +2921,7 @@ def withdrawal_keyboard():
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="❌  ОТМЕНА",
+        text="â  ÐÐ¢ÐÐÐÐ",
         callback_data="wallet"
     )
 
@@ -2944,13 +2943,13 @@ async def withdraw_start(
     if balance < MIN_WITHDRAWAL:
         await edit_or_answer(
             callback,
-            "╭────────────────────╮\n"
-            "       💸 <b>WITHDRAW</b>\n"
-            "╰────────────────────╯\n\n"
-            f"💰 Доступно: "
-            f"<b>{money(balance)} ₽</b>\n\n"
-            "Минимальная сумма вывода: "
-            f"<b>{money(MIN_WITHDRAWAL)} ₽</b>\n"
+            "â­âââââââââââââââââââââ®\n"
+            "       ð¸ <b>WITHDRAW</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            f"ð° ÐÐ¾ÑÑÑÐ¿Ð½Ð¾: "
+            f"<b>{money(balance)} â½</b>\n\n"
+            "ÐÐ¸Ð½Ð¸Ð¼Ð°Ð»ÑÐ½Ð°Ñ ÑÑÐ¼Ð¼Ð° Ð²ÑÐ²Ð¾Ð´Ð°: "
+            f"<b>{money(MIN_WITHDRAWAL)} â½</b>\n"
             "(1 USDT)",
             wallet_keyboard(),
             PHOTO_WITHDRAW
@@ -2963,16 +2962,16 @@ async def withdraw_start(
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       💸 <b>WITHDRAW</b>\n"
-        "╰────────────────────╯\n\n"
-        f"💰 Доступно: "
-        f"<b>{money(balance)} ₽</b>\n"
-        f"📉 Минимум: "
-        f"<b>{money(MIN_WITHDRAWAL)} ₽</b> "
+        "â­âââââââââââââââââââââ®\n"
+        "       ð¸ <b>WITHDRAW</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        f"ð° ÐÐ¾ÑÑÑÐ¿Ð½Ð¾: "
+        f"<b>{money(balance)} â½</b>\n"
+        f"ð ÐÐ¸Ð½Ð¸Ð¼ÑÐ¼: "
+        f"<b>{money(MIN_WITHDRAWAL)} â½</b> "
         "(1 USDT)\n\n"
-        "Введите сумму вывода в рублях.\n\n"
-        "Например:\n"
+        "ÐÐ²ÐµÐ´Ð¸ÑÐµ ÑÑÐ¼Ð¼Ñ Ð²ÑÐ²Ð¾Ð´Ð° Ð² ÑÑÐ±Ð»ÑÑ.\n\n"
+        "ÐÐ°Ð¿ÑÐ¸Ð¼ÐµÑ:\n"
         "<code>5000</code>",
         withdrawal_keyboard(),
         PHOTO_WITHDRAW
@@ -2998,20 +2997,20 @@ async def my_withdrawals_handler(
 
     if not history:
         text = (
-            "💸 <b>WITHDRAWALS</b>\n\n"
-            "Заявок пока нет."
+            "ð¸ <b>WITHDRAWALS</b>\n\n"
+            "ÐÐ°ÑÐ²Ð¾Ðº Ð¿Ð¾ÐºÐ° Ð½ÐµÑ."
         )
 
     else:
         lines = [
-            "💸 <b>MY WITHDRAWALS</b>\n"
+            "ð¸ <b>MY WITHDRAWALS</b>\n"
         ]
 
         status_names = {
-            "pending": "⏳ Ожидает",
-            "approved": "✅ Подтверждён",
-            "rejected": "❌ Отклонён",
-            "paid": "💸 Выплачен",
+            "pending": "â³ ÐÐ¶Ð¸Ð´Ð°ÐµÑ",
+            "approved": "â ÐÐ¾Ð´ÑÐ²ÐµÑÐ¶Ð´ÑÐ½",
+            "rejected": "â ÐÑÐºÐ»Ð¾Ð½ÑÐ½",
+            "paid": "ð¸ ÐÑÐ¿Ð»Ð°ÑÐµÐ½",
         }
 
         for item in history:
@@ -3021,8 +3020,8 @@ async def my_withdrawals_handler(
             )
 
             lines.append(
-                f"#{item['id']} — "
-                f"<b>{money(item['amount_rub'])} ₽</b>\n"
+                f"#{item['id']} â "
+                f"<b>{money(item['amount_rub'])} â½</b>\n"
                 f"{status}"
             )
 
@@ -3031,7 +3030,7 @@ async def my_withdrawals_handler(
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="⬅️  ПРОФИЛЬ",
+        text="â¬ï¸  ÐÐ ÐÐ¤ÐÐÐ¬",
         callback_data="profile"
     )
 
@@ -3050,17 +3049,17 @@ def admin_main_keyboard():
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="👤  НАЙТИ ПОЛЬЗОВАТЕЛЯ",
+        text="ð¤  ÐÐÐÐ¢Ð ÐÐÐÐ¬ÐÐÐÐÐ¢ÐÐÐ¯",
         callback_data="admin_find_user"
     )
 
     builder.button(
-        text="💸  ЗАЯВКИ НА ВЫВОД",
+        text="ð¸  ÐÐÐ¯ÐÐÐ ÐÐ ÐÐ«ÐÐÐ",
         callback_data="admin_withdrawals"
     )
 
     builder.button(
-        text="⬅️  ГЛАВНОЕ МЕНЮ",
+        text="â¬ï¸  ÐÐÐÐÐÐÐ ÐÐÐÐ®",
         callback_data="back_main"
     )
 
@@ -3077,7 +3076,7 @@ async def admin_panel(
 
     if not is_admin(user_id):
         await callback.answer(
-            "Нет доступа",
+            "ÐÐµÑ Ð´Ð¾ÑÑÑÐ¿Ð°",
             show_alert=True
         )
         return
@@ -3086,11 +3085,11 @@ async def admin_panel(
 
     await edit_or_answer(
         callback,
-        "╔══════════════════════╗\n"
-        "      🛠 <b>ADMIN PANEL</b>\n"
-        "╚══════════════════════╝\n\n"
-        "Системное управление.\n\n"
-        "Выберите действие:",
+        "ââââââââââââââââââââââââ\n"
+        "      ð  <b>ADMIN PANEL</b>\n"
+        "ââââââââââââââââââââââââ\n\n"
+        "Ð¡Ð¸ÑÑÐµÐ¼Ð½Ð¾Ðµ ÑÐ¿ÑÐ°Ð²Ð»ÐµÐ½Ð¸Ðµ.\n\n"
+        "ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð´ÐµÐ¹ÑÑÐ²Ð¸Ðµ:",
         admin_main_keyboard(),
         PHOTO_ADMIN
     )
@@ -3108,7 +3107,7 @@ async def admin_find_user(
 
     if not is_admin(user_id):
         await callback.answer(
-            "Нет доступа",
+            "ÐÐµÑ Ð´Ð¾ÑÑÑÐ¿Ð°",
             show_alert=True
         )
         return
@@ -3120,8 +3119,8 @@ async def admin_find_user(
     await callback.answer()
 
     await callback.message.answer(
-        "👤 <b>USER SEARCH</b>\n\n"
-        "Отправьте Telegram ID пользователя."
+        "ð¤ <b>USER SEARCH</b>\n\n"
+        "ÐÑÐ¿ÑÐ°Ð²ÑÑÐµ Telegram ID Ð¿Ð¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ."
     )
 
 
@@ -3129,32 +3128,32 @@ def admin_user_keyboard():
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="💰  ВЫДАТЬ БАЛАНС",
+        text="ð°  ÐÐ«ÐÐÐ¢Ð¬ ÐÐÐÐÐÐ¡",
         callback_data="admin_add_balance"
     )
 
     builder.button(
-        text="➖  СНЯТЬ С БАЛАНСА",
+        text="â  Ð¡ÐÐ¯Ð¢Ð¬ Ð¡ ÐÐÐÐÐÐ¡Ð",
         callback_data="admin_remove_balance"
     )
 
     builder.button(
-        text="📊  ОБНОВИТЬ",
+        text="ð  ÐÐÐÐÐÐÐ¢Ð¬",
         callback_data="admin_refresh"
     )
 
     builder.button(
-        text="📜  ИСТОРИЯ ИГР",
+        text="ð  ÐÐ¡Ð¢ÐÐ ÐÐ¯ ÐÐÐ ",
         callback_data="admin_game_history"
     )
 
     builder.button(
-        text="💳  ИСТОРИЯ ПЛАТЕЖЕЙ",
+        text="ð³  ÐÐ¡Ð¢ÐÐ ÐÐ¯ ÐÐÐÐ¢ÐÐÐÐ",
         callback_data="admin_payment_history"
     )
 
     builder.button(
-        text="🛠  ADMIN PANEL",
+        text="ð   ADMIN PANEL",
         callback_data="admin"
     )
 
@@ -3175,12 +3174,12 @@ async def show_admin_user(
     }
 
     await message.answer(
-        "╭────────────────────╮\n"
-        "       👤 <b>USER</b>\n"
-        "╰────────────────────╯\n\n"
+        "â­âââââââââââââââââââââ®\n"
+        "       ð¤ <b>USER</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
         f"ID: <code>{target_id}</code>\n"
-        f"💰 Баланс: "
-        f"<b>{money(balance)} ₽</b>",
+        f"ð° ÐÐ°Ð»Ð°Ð½Ñ: "
+        f"<b>{money(balance)} â½</b>",
         reply_markup=admin_user_keyboard()
     )
 
@@ -3204,7 +3203,7 @@ async def admin_amount_start(
 
     if not is_admin(user_id):
         await callback.answer(
-            "Нет доступа",
+            "ÐÐµÑ Ð´Ð¾ÑÑÑÐ¿Ð°",
             show_alert=True
         )
         return
@@ -3213,7 +3212,7 @@ async def admin_amount_start(
 
     if not state or "target_user" not in state:
         await callback.answer(
-            "Пользователь не выбран",
+            "ÐÐ¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ Ð½Ðµ Ð²ÑÐ±ÑÐ°Ð½",
             show_alert=True
         )
         return
@@ -3230,9 +3229,9 @@ async def admin_amount_start(
     await callback.answer()
 
     text = (
-        "💰 Введите сумму для выдачи:"
+        "ð° ÐÐ²ÐµÐ´Ð¸ÑÐµ ÑÑÐ¼Ð¼Ñ Ð´Ð»Ñ Ð²ÑÐ´Ð°ÑÐ¸:"
         if action == "add"
-        else "➖ Введите сумму для снятия:"
+        else "â ÐÐ²ÐµÐ´Ð¸ÑÐµ ÑÑÐ¼Ð¼Ñ Ð´Ð»Ñ ÑÐ½ÑÑÐ¸Ñ:"
     )
 
     await callback.message.answer(text)
@@ -3246,7 +3245,7 @@ async def admin_refresh(
 
     if not is_admin(user_id):
         await callback.answer(
-            "Нет доступа",
+            "ÐÐµÑ Ð´Ð¾ÑÑÑÐ¿Ð°",
             show_alert=True
         )
         return
@@ -3255,7 +3254,7 @@ async def admin_refresh(
 
     if not state or "target_user" not in state:
         await callback.answer(
-            "Пользователь не выбран",
+            "ÐÐ¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ Ð½Ðµ Ð²ÑÐ±ÑÐ°Ð½",
             show_alert=True
         )
         return
@@ -3265,7 +3264,7 @@ async def admin_refresh(
     balance = get_balance(target_id)
 
     await callback.answer(
-        f"Баланс: {money(balance)} ₽"
+        f"ÐÐ°Ð»Ð°Ð½Ñ: {money(balance)} â½"
     )
 
 
@@ -3281,7 +3280,7 @@ async def admin_game_history(
 
     if not is_admin(user_id):
         await callback.answer(
-            "Нет доступа",
+            "ÐÐµÑ Ð´Ð¾ÑÑÑÐ¿Ð°",
             show_alert=True
         )
         return
@@ -3290,7 +3289,7 @@ async def admin_game_history(
 
     if not state or "target_user" not in state:
         await callback.answer(
-            "Пользователь не выбран",
+            "ÐÐ¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ Ð½Ðµ Ð²ÑÐ±ÑÐ°Ð½",
             show_alert=True
         )
         return
@@ -3304,26 +3303,26 @@ async def admin_game_history(
 
     if not history:
         text = (
-            "📜 <b>GAME HISTORY</b>\n\n"
-            "Игр нет."
+            "ð <b>GAME HISTORY</b>\n\n"
+            "ÐÐ³Ñ Ð½ÐµÑ."
         )
 
     else:
         lines = [
-            "📜 <b>GAME HISTORY</b>\n"
+            "ð <b>GAME HISTORY</b>\n"
         ]
 
         for item in history:
             result = (
-                "✅"
+                "â"
                 if item["result"] == "win"
-                else "❌"
+                else "â"
             )
 
             lines.append(
                 f"{result} {item['game']} | "
-                f"{money(item['stake'])} ₽ → "
-                f"{money(item['payout'])} ₽"
+                f"{money(item['stake'])} â½ â "
+                f"{money(item['payout'])} â½"
             )
 
         text = "\n".join(lines)
@@ -3331,12 +3330,12 @@ async def admin_game_history(
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="👤  К ПОЛЬЗОВАТЕЛЮ",
+        text="ð¤  Ð ÐÐÐÐ¬ÐÐÐÐÐ¢ÐÐÐ®",
         callback_data="admin_user_back"
     )
 
     builder.button(
-        text="🛠  ADMIN PANEL",
+        text="ð   ADMIN PANEL",
         callback_data="admin"
     )
 
@@ -3359,7 +3358,7 @@ async def admin_payment_history(
 
     if not is_admin(user_id):
         await callback.answer(
-            "Нет доступа",
+            "ÐÐµÑ Ð´Ð¾ÑÑÑÐ¿Ð°",
             show_alert=True
         )
         return
@@ -3368,7 +3367,7 @@ async def admin_payment_history(
 
     if not state or "target_user" not in state:
         await callback.answer(
-            "Пользователь не выбран",
+            "ÐÐ¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ Ð½Ðµ Ð²ÑÐ±ÑÐ°Ð½",
             show_alert=True
         )
         return
@@ -3382,20 +3381,20 @@ async def admin_payment_history(
 
     if not history:
         text = (
-            "💳 <b>PAYMENT HISTORY</b>\n\n"
-            "Платежей нет."
+            "ð³ <b>PAYMENT HISTORY</b>\n\n"
+            "ÐÐ»Ð°ÑÐµÐ¶ÐµÐ¹ Ð½ÐµÑ."
         )
 
     else:
         lines = [
-            "💳 <b>PAYMENT HISTORY</b>\n"
+            "ð³ <b>PAYMENT HISTORY</b>\n"
         ]
 
         for item in history:
             lines.append(
-                f"💵 {item['amount_usdt']} USDT → "
-                f"{money(item['amount_rub'])} ₽\n"
-                f"🧾 #{item['invoice_id']}"
+                f"ðµ {item['amount_usdt']} USDT â "
+                f"{money(item['amount_rub'])} â½\n"
+                f"ð§¾ #{item['invoice_id']}"
             )
 
         text = "\n".join(lines)
@@ -3403,12 +3402,12 @@ async def admin_payment_history(
     builder = InlineKeyboardBuilder()
 
     builder.button(
-        text="👤  К ПОЛЬЗОВАТЕЛЮ",
+        text="ð¤  Ð ÐÐÐÐ¬ÐÐÐÐÐ¢ÐÐÐ®",
         callback_data="admin_user_back"
     )
 
     builder.button(
-        text="🛠  ADMIN PANEL",
+        text="ð   ADMIN PANEL",
         callback_data="admin"
     )
 
@@ -3427,7 +3426,7 @@ async def admin_user_back(
 
     if not is_admin(user_id):
         await callback.answer(
-            "Нет доступа",
+            "ÐÐµÑ Ð´Ð¾ÑÑÑÐ¿Ð°",
             show_alert=True
         )
         return
@@ -3436,7 +3435,7 @@ async def admin_user_back(
 
     if not state or "target_user" not in state:
         await callback.answer(
-            "Пользователь не выбран",
+            "ÐÐ¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ Ð½Ðµ Ð²ÑÐ±ÑÐ°Ð½",
             show_alert=True
         )
         return
@@ -3447,12 +3446,12 @@ async def admin_user_back(
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       👤 <b>USER</b>\n"
-        "╰────────────────────╯\n\n"
+        "â­âââââââââââââââââââââ®\n"
+        "       ð¤ <b>USER</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
         f"ID: <code>{target_id}</code>\n"
-        f"💰 Баланс: "
-        f"<b>{money(get_balance(target_id))} ₽</b>",
+        f"ð° ÐÐ°Ð»Ð°Ð½Ñ: "
+        f"<b>{money(get_balance(target_id))} â½</b>",
         admin_user_keyboard()
     )
 
@@ -3469,8 +3468,8 @@ def admin_withdrawal_list_keyboard(
     for item in withdrawals:
         builder.button(
             text=(
-                f"#{item['id']} — "
-                f"{money(item['amount_rub'])} ₽"
+                f"#{item['id']} â "
+                f"{money(item['amount_rub'])} â½"
             ),
             callback_data=(
                 f"admin_withdraw_{item['id']}"
@@ -3478,7 +3477,7 @@ def admin_withdrawal_list_keyboard(
         )
 
     builder.button(
-        text="⬅️  ADMIN PANEL",
+        text="â¬ï¸  ADMIN PANEL",
         callback_data="admin"
     )
 
@@ -3495,7 +3494,7 @@ async def admin_withdrawals(
 
     if not is_admin(user_id):
         await callback.answer(
-            "Нет доступа",
+            "ÐÐµÑ Ð´Ð¾ÑÑÑÐ¿Ð°",
             show_alert=True
         )
         return
@@ -3507,10 +3506,10 @@ async def admin_withdrawals(
     if not withdrawals:
         await edit_or_answer(
             callback,
-            "╭────────────────────╮\n"
-            "       💸 <b>WITHDRAWALS</b>\n"
-            "╰────────────────────╯\n\n"
-            "Ожидающих заявок нет.",
+            "â­âââââââââââââââââââââ®\n"
+            "       ð¸ <b>WITHDRAWALS</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            "ÐÐ¶Ð¸Ð´Ð°ÑÑÐ¸Ñ Ð·Ð°ÑÐ²Ð¾Ðº Ð½ÐµÑ.",
             admin_main_keyboard(),
             PHOTO_ADMIN
         )
@@ -3518,10 +3517,10 @@ async def admin_withdrawals(
 
     await edit_or_answer(
         callback,
-        "╭────────────────────╮\n"
-        "       💸 <b>WITHDRAWALS</b>\n"
-        "╰────────────────────╯\n\n"
-        "Выберите заявку:",
+        "â­âââââââââââââââââââââ®\n"
+        "       ð¸ <b>WITHDRAWALS</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        "ÐÑÐ±ÐµÑÐ¸ÑÐµ Ð·Ð°ÑÐ²ÐºÑ:",
         admin_withdrawal_list_keyboard(
             withdrawals
         ),
@@ -3538,7 +3537,7 @@ def admin_withdrawal_keyboard(
 
     if status == "pending":
         builder.button(
-            text="✅  ПОДТВЕРДИТЬ",
+            text="â  ÐÐÐÐ¢ÐÐÐ ÐÐÐ¢Ð¬",
             callback_data=(
                 f"approve_withdraw_"
                 f"{withdrawal['id']}"
@@ -3546,7 +3545,7 @@ def admin_withdrawal_keyboard(
         )
 
         builder.button(
-            text="❌  ОТКЛОНИТЬ",
+            text="â  ÐÐ¢ÐÐÐÐÐÐ¢Ð¬",
             callback_data=(
                 f"reject_withdraw_"
                 f"{withdrawal['id']}"
@@ -3555,7 +3554,7 @@ def admin_withdrawal_keyboard(
 
     elif status == "approved":
         builder.button(
-            text="💸  ВЫПЛАТА ОТПРАВЛЕНА",
+            text="ð¸  ÐÐ«ÐÐÐÐ¢Ð ÐÐ¢ÐÐ ÐÐÐÐÐÐ",
             callback_data=(
                 f"paid_withdraw_"
                 f"{withdrawal['id']}"
@@ -3563,12 +3562,12 @@ def admin_withdrawal_keyboard(
         )
 
     builder.button(
-        text="⬅️  К ЗАЯВКАМ",
+        text="â¬ï¸  Ð ÐÐÐ¯ÐÐÐÐ",
         callback_data="admin_withdrawals"
     )
 
     builder.button(
-        text="🛠  ADMIN PANEL",
+        text="ð   ADMIN PANEL",
         callback_data="admin"
     )
 
@@ -3587,7 +3586,7 @@ async def admin_withdrawal_view(
 
     if not is_admin(user_id):
         await callback.answer(
-            "Нет доступа",
+            "ÐÐµÑ Ð´Ð¾ÑÑÑÐ¿Ð°",
             show_alert=True
         )
         return
@@ -3598,7 +3597,7 @@ async def admin_withdrawal_view(
         )
     except Exception:
         await callback.answer(
-            "Ошибка заявки",
+            "ÐÑÐ¸Ð±ÐºÐ° Ð·Ð°ÑÐ²ÐºÐ¸",
             show_alert=True
         )
         return
@@ -3609,7 +3608,7 @@ async def admin_withdrawal_view(
 
     if not withdrawal:
         await callback.answer(
-            "Заявка не найдена",
+            "ÐÐ°ÑÐ²ÐºÐ° Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð°",
             show_alert=True
         )
         return
@@ -3617,10 +3616,10 @@ async def admin_withdrawal_view(
     await callback.answer()
 
     status_names = {
-        "pending": "⏳ ОЖИДАЕТ",
-        "approved": "✅ ПОДТВЕРЖДЕНА",
-        "rejected": "❌ ОТКЛОНЕНА",
-        "paid": "💸 ВЫПЛАЧЕНА",
+        "pending": "â³ ÐÐÐÐÐÐÐ¢",
+        "approved": "â ÐÐÐÐ¢ÐÐÐ ÐÐÐÐÐ",
+        "rejected": "â ÐÐ¢ÐÐÐÐÐÐÐ",
+        "paid": "ð¸ ÐÐ«ÐÐÐÐ§ÐÐÐ",
     }
 
     status = status_names.get(
@@ -3630,23 +3629,23 @@ async def admin_withdrawal_view(
 
     destination = (
         withdrawal.get("payout_details")
-        or "Не указаны"
+        or "ÐÐµ ÑÐºÐ°Ð·Ð°Ð½Ñ"
     )
 
     text = (
-        "╭────────────────────╮\n"
-        "       💸 <b>WITHDRAWAL</b>\n"
-        "╰────────────────────╯\n\n"
-        f"🧾 Номер: "
+        "â­âââââââââââââââââââââ®\n"
+        "       ð¸ <b>WITHDRAWAL</b>\n"
+        "â°âââââââââââââââââââââ¯\n\n"
+        f"ð§¾ ÐÐ¾Ð¼ÐµÑ: "
         f"<b>#{withdrawal['id']}</b>\n"
-        f"👤 User ID: "
+        f"ð¤ User ID: "
         f"<code>{withdrawal['user_id']}</code>\n"
-        f"💰 Сумма: "
-        f"<b>{money(withdrawal['amount_rub'])} ₽</b>\n"
-        f"💳 Метод: <b>manual</b>\n"
-        f"📍 Реквизиты:\n"
+        f"ð° Ð¡ÑÐ¼Ð¼Ð°: "
+        f"<b>{money(withdrawal['amount_rub'])} â½</b>\n"
+        f"ð³ ÐÐµÑÐ¾Ð´: <b>manual</b>\n"
+        f"ð Ð ÐµÐºÐ²Ð¸Ð·Ð¸ÑÑ:\n"
         f"<code>{destination}</code>\n\n"
-        f"📌 Статус: <b>{status}</b>"
+        f"ð Ð¡ÑÐ°ÑÑÑ: <b>{status}</b>"
     )
 
     await edit_or_answer(
@@ -3672,7 +3671,7 @@ async def admin_approve_withdrawal(
 
     if not is_admin(user_id):
         await callback.answer(
-            "Нет доступа",
+            "ÐÐµÑ Ð´Ð¾ÑÑÑÐ¿Ð°",
             show_alert=True
         )
         return
@@ -3683,7 +3682,7 @@ async def admin_approve_withdrawal(
         )
     except Exception:
         await callback.answer(
-            "Ошибка заявки",
+            "ÐÑÐ¸Ð±ÐºÐ° Ð·Ð°ÑÐ²ÐºÐ¸",
             show_alert=True
         )
         return
@@ -3694,14 +3693,14 @@ async def admin_approve_withdrawal(
 
     if not withdrawal:
         await callback.answer(
-            "Заявка не найдена",
+            "ÐÐ°ÑÐ²ÐºÐ° Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð°",
             show_alert=True
         )
         return
 
     if withdrawal.get("status") != "pending":
         await callback.answer(
-            "Заявка уже обработана",
+            "ÐÐ°ÑÐ²ÐºÐ° ÑÐ¶Ðµ Ð¾Ð±ÑÐ°Ð±Ð¾ÑÐ°Ð½Ð°",
             show_alert=True
         )
         return
@@ -3712,7 +3711,7 @@ async def admin_approve_withdrawal(
 
     if result is None:
         await callback.answer(
-            "Не удалось подтвердить заявку",
+            "ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¿Ð¾Ð´ÑÐ²ÐµÑÐ´Ð¸ÑÑ Ð·Ð°ÑÐ²ÐºÑ",
             show_alert=True
         )
         return
@@ -3724,13 +3723,13 @@ async def admin_approve_withdrawal(
     try:
         await bot.send_message(
             withdrawal["user_id"],
-            "✅ <b>ВЫВОД ПОДТВЕРЖДЁН</b>\n\n"
-            f"🧾 Заявка: "
+            "â <b>ÐÐ«ÐÐÐ ÐÐÐÐ¢ÐÐÐ ÐÐÐÐ</b>\n\n"
+            f"ð§¾ ÐÐ°ÑÐ²ÐºÐ°: "
             f"<b>#{withdrawal_id}</b>\n"
-            f"💰 Сумма: "
-            f"<b>{money(withdrawal['amount_rub'])} ₽</b>\n\n"
-            "Заявка подтверждена администратором.\n"
-            "Выплата будет выполнена вручную."
+            f"ð° Ð¡ÑÐ¼Ð¼Ð°: "
+            f"<b>{money(withdrawal['amount_rub'])} â½</b>\n\n"
+            "ÐÐ°ÑÐ²ÐºÐ° Ð¿Ð¾Ð´ÑÐ²ÐµÑÐ¶Ð´ÐµÐ½Ð° Ð°Ð´Ð¼Ð¸Ð½Ð¸ÑÑÑÐ°ÑÐ¾ÑÐ¾Ð¼.\n"
+            "ÐÑÐ¿Ð»Ð°ÑÐ° Ð±ÑÐ´ÐµÑ Ð²ÑÐ¿Ð¾Ð»Ð½ÐµÐ½Ð° Ð²ÑÑÑÐ½ÑÑ."
         )
     except Exception as error:
         print(
@@ -3740,7 +3739,7 @@ async def admin_approve_withdrawal(
         )
 
     await callback.answer(
-        "Заявка подтверждена"
+        "ÐÐ°ÑÐ²ÐºÐ° Ð¿Ð¾Ð´ÑÐ²ÐµÑÐ¶Ð´ÐµÐ½Ð°"
     )
 
     await admin_withdrawal_view(
@@ -3762,7 +3761,7 @@ async def admin_reject_withdrawal(
 
     if not is_admin(user_id):
         await callback.answer(
-            "Нет доступа",
+            "ÐÐµÑ Ð´Ð¾ÑÑÑÐ¿Ð°",
             show_alert=True
         )
         return
@@ -3773,7 +3772,7 @@ async def admin_reject_withdrawal(
         )
     except Exception:
         await callback.answer(
-            "Ошибка заявки",
+            "ÐÑÐ¸Ð±ÐºÐ° Ð·Ð°ÑÐ²ÐºÐ¸",
             show_alert=True
         )
         return
@@ -3784,14 +3783,14 @@ async def admin_reject_withdrawal(
 
     if not withdrawal:
         await callback.answer(
-            "Заявка не найдена",
+            "ÐÐ°ÑÐ²ÐºÐ° Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð°",
             show_alert=True
         )
         return
 
     if withdrawal.get("status") != "pending":
         await callback.answer(
-            "Заявка уже обработана",
+            "ÐÐ°ÑÐ²ÐºÐ° ÑÐ¶Ðµ Ð¾Ð±ÑÐ°Ð±Ð¾ÑÐ°Ð½Ð°",
             show_alert=True
         )
         return
@@ -3802,7 +3801,7 @@ async def admin_reject_withdrawal(
 
     if result is None:
         await callback.answer(
-            "Не удалось отклонить заявку",
+            "ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð¾ÑÐºÐ»Ð¾Ð½Ð¸ÑÑ Ð·Ð°ÑÐ²ÐºÑ",
             show_alert=True
         )
         return
@@ -3814,14 +3813,14 @@ async def admin_reject_withdrawal(
     try:
         await bot.send_message(
             withdrawal["user_id"],
-            "❌ <b>ВЫВОД ОТКЛОНЁН</b>\n\n"
-            f"🧾 Заявка: "
+            "â <b>ÐÐ«ÐÐÐ ÐÐ¢ÐÐÐÐÐÐ</b>\n\n"
+            f"ð§¾ ÐÐ°ÑÐ²ÐºÐ°: "
             f"<b>#{withdrawal_id}</b>\n"
-            f"💰 Сумма: "
-            f"<b>{money(withdrawal['amount_rub'])} ₽</b>\n\n"
-            "Заявка отклонена.\n"
-            "Зарезервированные средства "
-            "возвращены на баланс."
+            f"ð° Ð¡ÑÐ¼Ð¼Ð°: "
+            f"<b>{money(withdrawal['amount_rub'])} â½</b>\n\n"
+            "ÐÐ°ÑÐ²ÐºÐ° Ð¾ÑÐºÐ»Ð¾Ð½ÐµÐ½Ð°.\n"
+            "ÐÐ°ÑÐµÐ·ÐµÑÐ²Ð¸ÑÐ¾Ð²Ð°Ð½Ð½ÑÐµ ÑÑÐµÐ´ÑÑÐ²Ð° "
+            "Ð²Ð¾Ð·Ð²ÑÐ°ÑÐµÐ½Ñ Ð½Ð° Ð±Ð°Ð»Ð°Ð½Ñ."
         )
     except Exception as error:
         print(
@@ -3831,7 +3830,7 @@ async def admin_reject_withdrawal(
         )
 
     await callback.answer(
-        "Заявка отклонена, средства возвращены"
+        "ÐÐ°ÑÐ²ÐºÐ° Ð¾ÑÐºÐ»Ð¾Ð½ÐµÐ½Ð°, ÑÑÐµÐ´ÑÑÐ²Ð° Ð²Ð¾Ð·Ð²ÑÐ°ÑÐµÐ½Ñ"
     )
 
     await admin_withdrawal_view(
@@ -3853,7 +3852,7 @@ async def admin_paid_withdrawal(
 
     if not is_admin(user_id):
         await callback.answer(
-            "Нет доступа",
+            "ÐÐµÑ Ð´Ð¾ÑÑÑÐ¿Ð°",
             show_alert=True
         )
         return
@@ -3864,7 +3863,7 @@ async def admin_paid_withdrawal(
         )
     except Exception:
         await callback.answer(
-            "Ошибка заявки",
+            "ÐÑÐ¸Ð±ÐºÐ° Ð·Ð°ÑÐ²ÐºÐ¸",
             show_alert=True
         )
         return
@@ -3875,14 +3874,14 @@ async def admin_paid_withdrawal(
 
     if not withdrawal:
         await callback.answer(
-            "Заявка не найдена",
+            "ÐÐ°ÑÐ²ÐºÐ° Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð°",
             show_alert=True
         )
         return
 
     if withdrawal.get("status") != "approved":
         await callback.answer(
-            "Сначала подтвердите заявку",
+            "Ð¡Ð½Ð°ÑÐ°Ð»Ð° Ð¿Ð¾Ð´ÑÐ²ÐµÑÐ´Ð¸ÑÐµ Ð·Ð°ÑÐ²ÐºÑ",
             show_alert=True
         )
         return
@@ -3899,14 +3898,14 @@ async def admin_paid_withdrawal(
         )
 
         await callback.answer(
-            "Ошибка завершения выплаты",
+            "ÐÑÐ¸Ð±ÐºÐ° Ð·Ð°Ð²ÐµÑÑÐµÐ½Ð¸Ñ Ð²ÑÐ¿Ð»Ð°ÑÑ",
             show_alert=True
         )
         return
 
     if result is None:
         await callback.answer(
-            "Не удалось завершить заявку",
+            "ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ Ð·Ð°Ð²ÐµÑÑÐ¸ÑÑ Ð·Ð°ÑÐ²ÐºÑ",
             show_alert=True
         )
         return
@@ -3918,13 +3917,13 @@ async def admin_paid_withdrawal(
     try:
         await bot.send_message(
             withdrawal["user_id"],
-            "💸 <b>ВЫПЛАТА ОТПРАВЛЕНА</b>\n\n"
-            f"🧾 Заявка: "
+            "ð¸ <b>ÐÐ«ÐÐÐÐ¢Ð ÐÐ¢ÐÐ ÐÐÐÐÐÐ</b>\n\n"
+            f"ð§¾ ÐÐ°ÑÐ²ÐºÐ°: "
             f"<b>#{withdrawal_id}</b>\n"
-            f"💰 Сумма: "
-            f"<b>{money(withdrawal['amount_rub'])} ₽</b>\n\n"
-            "Выплата отмечена администратором "
-            "как выполненная."
+            f"ð° Ð¡ÑÐ¼Ð¼Ð°: "
+            f"<b>{money(withdrawal['amount_rub'])} â½</b>\n\n"
+            "ÐÑÐ¿Ð»Ð°ÑÐ° Ð¾ÑÐ¼ÐµÑÐµÐ½Ð° Ð°Ð´Ð¼Ð¸Ð½Ð¸ÑÑÑÐ°ÑÐ¾ÑÐ¾Ð¼ "
+            "ÐºÐ°Ðº Ð²ÑÐ¿Ð¾Ð»Ð½ÐµÐ½Ð½Ð°Ñ."
         )
     except Exception as error:
         print(
@@ -3934,7 +3933,7 @@ async def admin_paid_withdrawal(
         )
 
     await callback.answer(
-        "Выплата отмечена как выполненная"
+        "ÐÑÐ¿Ð»Ð°ÑÐ° Ð¾ÑÐ¼ÐµÑÐµÐ½Ð° ÐºÐ°Ðº Ð²ÑÐ¿Ð¾Ð»Ð½ÐµÐ½Ð½Ð°Ñ"
     )
 
     await admin_withdrawal_view(
@@ -3966,9 +3965,9 @@ async def handle_withdrawal_message(
 
         except Exception:
             await message.answer(
-                "❌ Некорректная сумма.\n\n"
-                f"Минимальный вывод: "
-                f"<b>{money(MIN_WITHDRAWAL)} ₽</b>\n"
+                "â ÐÐµÐºÐ¾ÑÑÐµÐºÑÐ½Ð°Ñ ÑÑÐ¼Ð¼Ð°.\n\n"
+                f"ÐÐ¸Ð½Ð¸Ð¼Ð°Ð»ÑÐ½ÑÐ¹ Ð²ÑÐ²Ð¾Ð´: "
+                f"<b>{money(MIN_WITHDRAWAL)} â½</b>\n"
                 "(1 USDT)"
             )
             return True
@@ -3977,9 +3976,9 @@ async def handle_withdrawal_message(
 
         if amount > balance:
             await message.answer(
-                "❌ Недостаточно средств.\n\n"
-                f"💰 Ваш баланс: "
-                f"<b>{money(balance)} ₽</b>"
+                "â ÐÐµÐ´Ð¾ÑÑÐ°ÑÐ¾ÑÐ½Ð¾ ÑÑÐµÐ´ÑÑÐ².\n\n"
+                f"ð° ÐÐ°Ñ Ð±Ð°Ð»Ð°Ð½Ñ: "
+                f"<b>{money(balance)} â½</b>"
             )
             return True
 
@@ -3989,12 +3988,12 @@ async def handle_withdrawal_message(
         }
 
         await message.answer(
-            "💳 <b>РЕКВИЗИТЫ ДЛЯ ВЫВОДА</b>\n\n"
-            f"💰 Сумма: "
-            f"<b>{money(amount)} ₽</b>\n\n"
-            "Отправьте реквизиты, на которые "
-            "нужно выполнить выплату.\n\n"
-            "Например, адрес кошелька "
+            "ð³ <b>Ð ÐÐÐÐÐÐÐ¢Ð« ÐÐÐ¯ ÐÐ«ÐÐÐÐ</b>\n\n"
+            f"ð° Ð¡ÑÐ¼Ð¼Ð°: "
+            f"<b>{money(amount)} â½</b>\n\n"
+            "ÐÑÐ¿ÑÐ°Ð²ÑÑÐµ ÑÐµÐºÐ²Ð¸Ð·Ð¸ÑÑ, Ð½Ð° ÐºÐ¾ÑÐ¾ÑÑÐµ "
+            "Ð½ÑÐ¶Ð½Ð¾ Ð²ÑÐ¿Ð¾Ð»Ð½Ð¸ÑÑ Ð²ÑÐ¿Ð»Ð°ÑÑ.\n\n"
+            "ÐÐ°Ð¿ÑÐ¸Ð¼ÐµÑ, Ð°Ð´ÑÐµÑ ÐºÐ¾ÑÐµÐ»ÑÐºÐ° "
             "USDT TRC20."
         )
 
@@ -4008,8 +4007,8 @@ async def handle_withdrawal_message(
 
         if len(destination) < 5:
             await message.answer(
-                "❌ Реквизиты слишком короткие.\n"
-                "Проверьте и отправьте ещё раз."
+                "â Ð ÐµÐºÐ²Ð¸Ð·Ð¸ÑÑ ÑÐ»Ð¸ÑÐºÐ¾Ð¼ ÐºÐ¾ÑÐ¾ÑÐºÐ¸Ðµ.\n"
+                "ÐÑÐ¾Ð²ÐµÑÑÑÐµ Ð¸ Ð¾ÑÐ¿ÑÐ°Ð²ÑÑÐµ ÐµÑÑ ÑÐ°Ð·."
             )
             return True
 
@@ -4024,8 +4023,8 @@ async def handle_withdrawal_message(
             )
 
             await message.answer(
-                "❌ Заявка устарела.\n"
-                "Создайте вывод заново."
+                "â ÐÐ°ÑÐ²ÐºÐ° ÑÑÑÐ°ÑÐµÐ»Ð°.\n"
+                "Ð¡Ð¾Ð·Ð´Ð°Ð¹ÑÐµ Ð²ÑÐ²Ð¾Ð´ Ð·Ð°Ð½Ð¾Ð²Ð¾."
             )
             return True
 
@@ -4051,8 +4050,8 @@ async def handle_withdrawal_message(
             )
 
             await message.answer(
-                "❌ Не удалось создать заявку.\n\n"
-                "Возможно, недостаточно средств."
+                "â ÐÐµ ÑÐ´Ð°Ð»Ð¾ÑÑ ÑÐ¾Ð·Ð´Ð°ÑÑ Ð·Ð°ÑÐ²ÐºÑ.\n\n"
+                "ÐÐ¾Ð·Ð¼Ð¾Ð¶Ð½Ð¾, Ð½ÐµÐ´Ð¾ÑÑÐ°ÑÐ¾ÑÐ½Ð¾ ÑÑÐµÐ´ÑÑÐ²."
             )
             return True
 
@@ -4062,33 +4061,33 @@ async def handle_withdrawal_message(
         )
 
         await message.answer(
-            "╭────────────────────╮\n"
-            "       💸 <b>WITHDRAW</b>\n"
-            "╰────────────────────╯\n\n"
-            "✅ <b>ЗАЯВКА СОЗДАНА</b>\n\n"
-            f"🧾 Номер: "
+            "â­âââââââââââââââââââââ®\n"
+            "       ð¸ <b>WITHDRAW</b>\n"
+            "â°âââââââââââââââââââââ¯\n\n"
+            "â <b>ÐÐÐ¯ÐÐÐ Ð¡ÐÐÐÐÐÐ</b>\n\n"
+            f"ð§¾ ÐÐ¾Ð¼ÐµÑ: "
             f"<b>#{withdrawal['id']}</b>\n"
-            f"💰 Сумма: "
-            f"<b>{money(amount)} ₽</b>\n"
-            "⏳ Статус: "
-            "<b>ОЖИДАЕТ ПРОВЕРКИ</b>\n\n"
-            "Средства зарезервированы до решения "
-            "администратора.\n\n"
-            "После проверки вы получите уведомление."
+            f"ð° Ð¡ÑÐ¼Ð¼Ð°: "
+            f"<b>{money(amount)} â½</b>\n"
+            "â³ Ð¡ÑÐ°ÑÑÑ: "
+            "<b>ÐÐÐÐÐÐÐ¢ ÐÐ ÐÐÐÐ ÐÐ</b>\n\n"
+            "Ð¡ÑÐµÐ´ÑÑÐ²Ð° Ð·Ð°ÑÐµÐ·ÐµÑÐ²Ð¸ÑÐ¾Ð²Ð°Ð½Ñ Ð´Ð¾ ÑÐµÑÐµÐ½Ð¸Ñ "
+            "Ð°Ð´Ð¼Ð¸Ð½Ð¸ÑÑÑÐ°ÑÐ¾ÑÐ°.\n\n"
+            "ÐÐ¾ÑÐ»Ðµ Ð¿ÑÐ¾Ð²ÐµÑÐºÐ¸ Ð²Ñ Ð¿Ð¾Ð»ÑÑÐ¸ÑÐµ ÑÐ²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸Ðµ."
         )
 
         try:
             await bot.send_message(
                 8244079903,
-                "💸 <b>НОВАЯ ЗАЯВКА НА ВЫВОД</b>\n\n"
-                f"🧾 Заявка: "
+                "ð¸ <b>ÐÐÐÐÐ¯ ÐÐÐ¯ÐÐÐ ÐÐ ÐÐ«ÐÐÐ</b>\n\n"
+                f"ð§¾ ÐÐ°ÑÐ²ÐºÐ°: "
                 f"<b>#{withdrawal['id']}</b>\n"
-                f"👤 User ID: "
+                f"ð¤ User ID: "
                 f"<code>{user_id}</code>\n"
-                f"💰 Сумма: "
-                f"<b>{money(amount)} ₽</b>\n\n"
-                "Открой ADMIN PANEL → "
-                "ЗАЯВКИ НА ВЫВОД."
+                f"ð° Ð¡ÑÐ¼Ð¼Ð°: "
+                f"<b>{money(amount)} â½</b>\n\n"
+                "ÐÑÐºÑÐ¾Ð¹ ADMIN PANEL â "
+                "ÐÐÐ¯ÐÐÐ ÐÐ ÐÐ«ÐÐÐ."
             )
 
         except Exception as error:
@@ -4127,7 +4126,7 @@ async def handle_admin_message(
             target_id = int(text)
         except Exception:
             await message.answer(
-                "❌ ID должен быть числом."
+                "â ID Ð´Ð¾Ð»Ð¶ÐµÐ½ Ð±ÑÑÑ ÑÐ¸ÑÐ»Ð¾Ð¼."
             )
             return True
 
@@ -4152,8 +4151,8 @@ async def handle_admin_message(
 
         except Exception:
             await message.answer(
-                "❌ Введите положительное "
-                "целое число."
+                "â ÐÐ²ÐµÐ´Ð¸ÑÐµ Ð¿Ð¾Ð»Ð¾Ð¶Ð¸ÑÐµÐ»ÑÐ½Ð¾Ðµ "
+                "ÑÐµÐ»Ð¾Ðµ ÑÐ¸ÑÐ»Ð¾."
             )
             return True
 
@@ -4168,15 +4167,15 @@ async def handle_admin_message(
             )
 
             await message.answer(
-                "╭────────────────────╮\n"
-                "       💰 <b>BALANCE</b>\n"
-                "╰────────────────────╯\n\n"
-                "✅ <b>БАЛАНС ВЫДАН</b>\n\n"
-                f"👤 ID: "
+                "â­âââââââââââââââââââââ®\n"
+                "       ð° <b>BALANCE</b>\n"
+                "â°âââââââââââââââââââââ¯\n\n"
+                "â <b>ÐÐÐÐÐÐ¡ ÐÐ«ÐÐÐ</b>\n\n"
+                f"ð¤ ID: "
                 f"<code>{target_id}</code>\n"
-                f"💰 +{money(amount)} ₽\n"
-                f"💳 Новый баланс: "
-                f"<b>{money(new_balance)} ₽</b>",
+                f"ð° +{money(amount)} â½\n"
+                f"ð³ ÐÐ¾Ð²ÑÐ¹ Ð±Ð°Ð»Ð°Ð½Ñ: "
+                f"<b>{money(new_balance)} â½</b>",
                 reply_markup=admin_user_keyboard()
             )
 
@@ -4189,8 +4188,8 @@ async def handle_admin_message(
 
             if not success:
                 await message.answer(
-                    "❌ Недостаточно средств "
-                    "на балансе пользователя."
+                    "â ÐÐµÐ´Ð¾ÑÑÐ°ÑÐ¾ÑÐ½Ð¾ ÑÑÐµÐ´ÑÑÐ² "
+                    "Ð½Ð° Ð±Ð°Ð»Ð°Ð½ÑÐµ Ð¿Ð¾Ð»ÑÐ·Ð¾Ð²Ð°ÑÐµÐ»Ñ."
                 )
                 return True
 
@@ -4199,15 +4198,15 @@ async def handle_admin_message(
             )
 
             await message.answer(
-                "╭────────────────────╮\n"
-                "       💰 <b>BALANCE</b>\n"
-                "╰────────────────────╯\n\n"
-                "✅ <b>БАЛАНС СНЯТ</b>\n\n"
-                f"👤 ID: "
+                "â­âââââââââââââââââââââ®\n"
+                "       ð° <b>BALANCE</b>\n"
+                "â°âââââââââââââââââââââ¯\n\n"
+                "â <b>ÐÐÐÐÐÐ¡ Ð¡ÐÐ¯Ð¢</b>\n\n"
+                f"ð¤ ID: "
                 f"<code>{target_id}</code>\n"
-                f"➖ {money(amount)} ₽\n"
-                f"💳 Новый баланс: "
-                f"<b>{money(new_balance)} ₽</b>",
+                f"â {money(amount)} â½\n"
+                f"ð³ ÐÐ¾Ð²ÑÐ¹ Ð±Ð°Ð»Ð°Ð½Ñ: "
+                f"<b>{money(new_balance)} â½</b>",
                 reply_markup=admin_user_keyboard()
             )
 
@@ -4219,230 +4218,6 @@ async def handle_admin_message(
         return True
 
     return False
-
-async def handle_stake_message(
-    message: Message,
-    state: dict
-):
-    user_id = message.from_user.id
-    if not state.get("awaiting_stake"):
-        return False
-    game_type = state.get("type")
-    allowed_games = {
-        "dice",
-        "two_dice",
-        "slots",
-        "bowling",
-        "roulette",
-        "mines",
-        "crash",
-    }
-    if game_type not in allowed_games:
-        games.pop(
-            user_id,
-            None
-        )
-        await message.answer(
-            "❌ <b>Игра устарела.</b>\n\n"
-            "Выберите игру заново."
-        )
-        return True
-    text = (
-        message.text or ""
-    ).strip()
-    try:
-        stake = int(text)
-        if stake < 50:
-            raise ValueError
-    except (TypeError, ValueError):
-        await message.answer(
-            "❌ <b>НЕКОРРЕКТНАЯ СТАВКА</b>\n\n"
-            "Введите целое число не меньше "
-            "<b>50 ₽</b>.\n\n"
-            "Например:\n"
-            "<code>350</code>"
-        )
-        return True
-    balance = get_balance(user_id)
-    if stake > balance:
-        await message.answer(
-            "❌ <b>НЕДОСТАТОЧНО СРЕДСТВ</b>\n\n"
-            f"💳 Ваш баланс: "
-            f"<b>{money(balance)} ₽</b>\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "Введите сумму не больше "
-            "текущего баланса."
-        )
-        return True
-    games[user_id] = {
-        "type": game_type,
-        "stake": stake
-    }
-    # DICE
-    if game_type == "dice":
-        builder = InlineKeyboardBuilder()
-        builder.button(
-            text="⬆️  БОЛЬШЕ 3",
-            callback_data="dice_more"
-        )
-        builder.button(
-            text="⬇️  МЕНЬШЕ 4",
-            callback_data="dice_less"
-        )
-        builder.button(
-            text="🎯  РОВНО 2",
-            callback_data="dice_two"
-        )
-        builder.button(
-            text="⬅️  НАЗАД",
-            callback_data="game_dice"
-        )
-        builder.adjust(1)
-        await message.answer(
-            "╭────────────────────╮\n"
-            "       🎲 <b>DICE</b>\n"
-            "╰────────────────────╯\n\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "Выберите прогноз:",
-            reply_markup=builder.as_markup()
-        )
-        return True
-    # TWO DICE
-    if game_type == "two_dice":
-        builder = InlineKeyboardBuilder()
-        builder.button(
-            text="⬆️  СУММА 8–12",
-            callback_data="two_dice_high"
-        )
-        builder.button(
-            text="⬇️  СУММА 2–6",
-            callback_data="two_dice_low"
-        )
-        builder.button(
-            text="🎯  РОВНО 7",
-            callback_data="two_dice_seven"
-        )
-        builder.button(
-            text="⬅️  НАЗАД",
-            callback_data="game_two_dice"
-        )
-        builder.adjust(1)
-        await message.answer(
-            "╭────────────────────╮\n"
-            "       🎲🎲 <b>TWO DICE</b>\n"
-            "╰────────────────────╯\n\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "Выберите прогноз:",
-            reply_markup=builder.as_markup()
-        )
-        return True
-    # SLOTS
-    if game_type == "slots":
-        await message.answer(
-            "╭────────────────────╮\n"
-            "       🎰 <b>SLOTS</b>\n"
-            "╰────────────────────╯\n\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "🍋🍋🍋 — ×10\n"
-            "7️⃣7️⃣7️⃣ — ×50\n"
-            "3 одинаковых — ×3.5\n"
-            "2 одинаковых — ×1.85\n"
-            "Другие комбинации — проигрыш.\n\n"
-            "Подтвердить ставку?",
-            reply_markup=confirm_bet_keyboard("slots")
-        )
-        return True
-    # BOWLING
-    if game_type == "bowling":
-        builder = InlineKeyboardBuilder()
-        builder.button(
-            text="🎳  ПОПАЛ",
-            callback_data="bowling_hit"
-        )
-        builder.button(
-            text="💨  ПРОМАХ",
-            callback_data="bowling_miss"
-        )
-        builder.button(
-            text="⬅️  НАЗАД",
-            callback_data="game_bowling"
-        )
-        builder.adjust(1)
-        await message.answer(
-            "╭────────────────────╮\n"
-            "       🎳 <b>BOWLING</b>\n"
-            "╰────────────────────╯\n\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "Выберите прогноз:",
-            reply_markup=builder.as_markup()
-        )
-        return True
-    # ROULETTE
-    if game_type == "roulette":
-        builder = InlineKeyboardBuilder()
-        builder.button(
-            text="🔴  КРАСНОЕ",
-            callback_data="roulette_red"
-        )
-        builder.button(
-            text="⚫  ЧЁРНОЕ",
-            callback_data="roulette_black"
-        )
-        builder.button(
-            text="🟢  ZERO",
-            callback_data="roulette_zero"
-        )
-        builder.button(
-            text="⬅️  НАЗАД",
-            callback_data="game_roulette"
-        )
-        builder.adjust(1)
-        await message.answer(
-            "╭────────────────────╮\n"
-            "       🎡 <b>ROULETTE</b>\n"
-            "╰────────────────────╯\n\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "Выберите цвет:",
-            reply_markup=builder.as_markup()
-        )
-        return True
-    # MINES
-    if game_type == "mines":
-        await message.answer(
-            "╭────────────────────╮\n"
-            "       💣 <b>MINES</b>\n"
-            "╰────────────────────╯\n\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "Подтвердить ставку?",
-            reply_markup=confirm_bet_keyboard("mines")
-        )
-        return True
-    # CRASH
-    if game_type == "crash":
-        await message.answer(
-            "╭────────────────────╮\n"
-            "       🚀 <b>CRASH</b>\n"
-            "╰────────────────────╯\n\n"
-            f"💎 Ставка: "
-            f"<b>{money(stake)} ₽</b>\n\n"
-            "Самолёт будет набирать множитель.\n"
-            "Ваша задача — забрать выигрыш "
-            "до CRASH.\n\n"
-            "Подтвердить ставку?",
-            reply_markup=confirm_bet_keyboard("crash")
-        )
-        return True
-    return True
-# =========================================================
-# SINGLE MESSAGE HANDLER
-# =========================================================
 
 @dp.message()
 async def text_message_handler(message: Message):
