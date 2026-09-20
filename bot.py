@@ -1458,18 +1458,14 @@ async def confirm_slots(
     callback: CallbackQuery
 ):
     user_id = callback.from_user.id
-
     game = games.get(user_id)
-
     if not game:
         await callback.answer(
             "Игра устарела",
             show_alert=True
         )
         return
-
     stake = game["stake"]
-
     if not subtract_balance(
         user_id,
         stake
@@ -1479,19 +1475,13 @@ async def confirm_slots(
             show_alert=True
         )
         return
-
     await callback.answer()
-
     dice = await callback.message.answer_dice(
         emoji="🎰"
     )
-
     await asyncio.sleep(4)
-
     value = dice.dice.value
-
     symbols = slot_symbols_from_value(value)
-
     print(
         "SLOT RESULT:",
         {
@@ -1499,18 +1489,15 @@ async def confirm_slots(
             "symbols": symbols
         }
     )
-
     display_result = " | ".join(symbols)
-
+    # 777 — JACKPOT ×50
     if value == 64:
-        multiplier = SLOT_SEVEN_MULTIPLIER
-        payout = stake * multiplier
-
+        multiplier = 50
+        payout = round(stake * multiplier)
         change_balance(
             user_id,
             payout
         )
-
         record_game(
             user_id,
             "slots",
@@ -1519,7 +1506,6 @@ async def confirm_slots(
             multiplier,
             payout
         )
-
         text = (
             "╔══════════════════════╗\n"
             "       🔥 <b>JACKPOT</b>\n"
@@ -1531,20 +1517,14 @@ async def confirm_slots(
             f"💳 Баланс: "
             f"<b>{money(get_balance(user_id))} ₽</b>"
         )
-
-    elif (
-        symbols[0] == "🍋"
-        and symbols[1] == "🍋"
-        and symbols[2] == "🍋"
-    ):
+    # 🍋🍋🍋 — ×10
+    elif symbols == ["🍋", "🍋", "🍋"]:
         multiplier = 10
-        payout = stake * multiplier
-
+        payout = round(stake * multiplier)
         change_balance(
             user_id,
             payout
         )
-
         record_game(
             user_id,
             "slots",
@@ -1553,7 +1533,6 @@ async def confirm_slots(
             multiplier,
             payout
         )
-
         text = (
             "╭────────────────────╮\n"
             "       🍋 <b>WIN</b>\n"
@@ -1565,7 +1544,70 @@ async def confirm_slots(
             f"💳 Баланс: "
             f"<b>{money(get_balance(user_id))} ₽</b>"
         )
-
+    # Любые другие 3 одинаковых — ×3.5
+    elif (
+        symbols[0] == symbols[1]
+        and symbols[1] == symbols[2]
+    ):
+        multiplier = 3.5
+        payout = round(stake * multiplier)
+        change_balance(
+            user_id,
+            payout
+        )
+        record_game(
+            user_id,
+            "slots",
+            stake,
+            "win",
+            multiplier,
+            payout
+        )
+        text = (
+            "╭────────────────────╮\n"
+            "       🎰 <b>WIN</b>\n"
+            "╰────────────────────╯\n\n"
+            f"🎰 <b>{display_result}</b>\n\n"
+            "💎 <b>ТРИ ОДИНАКОВЫХ</b>\n"
+            "×3.5\n\n"
+            f"💰 Выигрыш: "
+            f"<b>+{money(payout)} ₽</b>\n"
+            f"💳 Баланс: "
+            f"<b>{money(get_balance(user_id))} ₽</b>"
+        )
+    # Ровно 2 одинаковых — ×1.85
+    elif (
+        symbols[0] == symbols[1]
+        or symbols[0] == symbols[2]
+        or symbols[1] == symbols[2]
+    ):
+        multiplier = 1.85
+        payout = round(stake * multiplier)
+        change_balance(
+            user_id,
+            payout
+        )
+        record_game(
+            user_id,
+            "slots",
+            stake,
+            "win",
+            multiplier,
+            payout
+        )
+        text = (
+            "╭────────────────────╮\n"
+            "       ✨ <b>WIN</b>\n"
+            "╰────────────────────╯\n\n"
+            f"🎰 <b>{display_result}</b>\n\n"
+            "✨ <b>ДВА ОДИНАКОВЫХ</b>\n"
+            "×1.85\n\n"
+            f"💰 Выигрыш: "
+            f"<b>+{money(payout)} ₽</b>\n"
+            f"💳 Баланс: "
+            f"<b>{money(get_balance(user_id))} ₽</b>"
+        )
+    # Остальные комбинации — проигрыш
     else:
         record_game(
             user_id,
@@ -1575,7 +1617,6 @@ async def confirm_slots(
             0,
             0
         )
-
         text = (
             "╭────────────────────╮\n"
             "       💥 <b>LOSS</b>\n"
@@ -1585,9 +1626,7 @@ async def confirm_slots(
             f"💳 Баланс: "
             f"<b>{money(get_balance(user_id))} ₽</b>"
         )
-
     games.pop(user_id, None)
-
     await callback.message.answer(
         text,
         reply_markup=after_game_keyboard()
