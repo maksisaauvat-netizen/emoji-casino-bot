@@ -82,6 +82,8 @@ SLOT_SEVEN_MULTIPLIER = 50
 CRASH_MIN = 1.05
 CRASH_MAX = 20.0
 
+MIN_WITHDRAWAL = 500
+
 
 # =========================================================
 # HELPERS
@@ -245,6 +247,11 @@ def wallet_keyboard():
     )
 
     builder.button(
+        text="💸 ВЫВЕСТИ",
+        callback_data="withdraw"
+    )
+
+    builder.button(
         text="⬅️ НАЗАД",
         callback_data="back_main"
     )
@@ -310,10 +317,10 @@ def slot_symbols_from_value(value: int):
         ]
 
     symbols = [
-        "🍸",   # BAR
-        "🍇",   # BERRIES
-        "🍋",   # LEMON
-        "7️⃣",  # SEVEN
+        "🍸",
+        "🍇",
+        "🍋",
+        "7️⃣",
     ]
 
     left_raw = (value - 1) & 0x03
@@ -341,6 +348,8 @@ def slot_symbols_from_value(value: int):
 async def start_handler(message: Message):
     user_id = safe_user_id(message)
 
+    # Новый пользователь создаётся здесь.
+    # Размер стартового баланса задаётся database.py.
     ensure_user(user_id)
 
     await message.answer(
@@ -437,6 +446,11 @@ async def profile_handler(callback: CallbackQuery):
     builder.button(
         text="💳 ПЛАТЕЖИ",
         callback_data="my_payments"
+    )
+
+    builder.button(
+        text="💸 МОИ ВЫВОДЫ",
+        callback_data="my_withdrawals"
     )
 
     builder.button(
@@ -1197,20 +1211,13 @@ async def confirm_slots(callback: CallbackQuery):
 
     await callback.answer()
 
-    # Настоящая Telegram-анимация слота
     dice = await callback.message.answer_dice(
         emoji="🎰"
     )
 
-    # Telegram успевает показать полную анимацию
     await asyncio.sleep(4)
 
     value = dice.dice.value
-
-    # =====================================================
-    # ВАЖНО:
-    # Здесь используется точная схема Telegram.
-    # =====================================================
 
     symbols = slot_symbols_from_value(value)
 
@@ -1224,7 +1231,6 @@ async def confirm_slots(callback: CallbackQuery):
 
     display_result = " | ".join(symbols)
 
-    # 777
     if value == 64:
         multiplier = SLOT_SEVEN_MULTIPLIER
         payout = stake * multiplier
@@ -1250,7 +1256,6 @@ async def confirm_slots(callback: CallbackQuery):
             f"💳 Баланс: <b>{money(get_balance(user_id))} ₽</b>"
         )
 
-    # 3 лимона
     elif (
         symbols[0] == "🍋"
         and symbols[1] == "🍋"
@@ -1631,9 +1636,7 @@ async def confirm_roulette(callback: CallbackQuery):
 
     for frame in animation:
         try:
-            await message.edit_text(
-                frame
-            )
+            await message.edit_text(frame)
         except Exception:
             pass
 
@@ -2010,19 +2013,9 @@ async def run_crash_game(
     message,
     crash_point: float
 ):
-    """
-    Фоновая анимация CRASH.
-
-    Важно:
-    - обработчик confirm_crash сразу заканчивается;
-    - эта функция продолжает анимацию отдельно;
-    - кнопка ЗАБРАТЬ остаётся доступной во время анимации.
-    """
-
     try:
         multiplier = 1.00
 
-        # Сохраняем начальный множитель
         if user_id in games:
             games[user_id]["multiplier"] = multiplier
             games[user_id]["crash_point"] = crash_point
@@ -2030,15 +2023,12 @@ async def run_crash_game(
         while True:
             game = games.get(user_id)
 
-            # Игрок уже забрал выигрыш
             if not game:
                 return
 
-            # Игра была остановлена
             if game.get("crash_finished"):
                 return
 
-            # Если множитель достиг crash point
             if multiplier >= crash_point:
                 break
 
@@ -2063,10 +2053,8 @@ async def run_crash_game(
                     repr(error)
                 )
 
-            # Скорость анимации
             await asyncio.sleep(0.55)
 
-            # Ускоряем рост
             if multiplier < 2:
                 multiplier += 0.08
 
@@ -2084,16 +2072,11 @@ async def run_crash_game(
                 2
             )
 
-        # =================================================
-        # CRASH
-        # =================================================
-
         game = games.get(user_id)
 
         if not game:
             return
 
-        # Если игрок успел забрать деньги
         if game.get("cashed_out"):
             return
 
@@ -2133,8 +2116,6 @@ async def run_crash_game(
             )
 
     except asyncio.CancelledError:
-        # Нормальная ситуация:
-        # игрок нажал ЗАБРАТЬ.
         print(
             "CRASH TASK CANCELLED:",
             user_id
@@ -2163,7 +2144,6 @@ async def confirm_crash(callback: CallbackQuery):
 
     stake = game["stake"]
 
-    # Списываем ставку ОДИН раз
     if not subtract_balance(
         user_id,
         stake
@@ -2174,7 +2154,6 @@ async def confirm_crash(callback: CallbackQuery):
         )
         return
 
-    # Генерируем точку падения
     crash_point = round(
         random.uniform(
             CRASH_MIN,
@@ -2192,7 +2171,6 @@ async def confirm_crash(callback: CallbackQuery):
         "🚀 CRASH НАЧАЛСЯ!"
     )
 
-    # Отправляем первое сообщение СРАЗУ
     message = await callback.message.answer(
         "🚀 <b>CRASH</b>\n\n"
         "✈️ Самолёт взлетел!\n\n"
@@ -2201,9 +2179,6 @@ async def confirm_crash(callback: CallbackQuery):
         reply_markup=crash_keyboard(1.00)
     )
 
-    # Запускаем анимацию в фоне.
-    # Именно это позволяет одновременно
-    # принимать нажатие кнопки ЗАБРАТЬ.
     task = asyncio.create_task(
         run_crash_game(
             user_id,
@@ -2228,7 +2203,6 @@ async def crash_cashout(callback: CallbackQuery):
         )
         return
 
-    # Проверяем, не произошло ли падение
     if game.get("crash_finished"):
         await callback.answer(
             "💥 Слишком поздно!",
@@ -2247,7 +2221,6 @@ async def crash_cashout(callback: CallbackQuery):
         game["stake"]
     )
 
-    # Фиксируем выигрыш ДО отмены задачи
     game["cashed_out"] = True
 
     payout = int(
@@ -2256,13 +2229,11 @@ async def crash_cashout(callback: CallbackQuery):
         )
     )
 
-    # Останавливаем анимацию
     task = game.get("task")
 
     if task:
         task.cancel()
 
-    # Начисляем выигрыш
     change_balance(
         user_id,
         payout
@@ -2343,20 +2314,18 @@ async def crash_giveup(callback: CallbackQuery):
         f"💳 Баланс: <b>{money(get_balance(user_id))} ₽</b>",
         after_game_keyboard()
     )
-    
+
+
 # =========================================================
 # WITHDRAWAL
 # =========================================================
-
-MIN_WITHDRAWAL = 500
-
 
 def withdrawal_keyboard():
     builder = InlineKeyboardBuilder()
 
     builder.button(
         text="❌ ОТМЕНА",
-        callback_data="back_main"
+        callback_data="wallet"
     )
 
     builder.adjust(1)
@@ -2427,6 +2396,7 @@ async def my_withdrawals_handler(
             "pending": "⏳ Ожидает",
             "approved": "✅ Подтверждён",
             "rejected": "❌ Отклонён",
+            "paid": "💸 Выплачен",
         }
 
         for item in history:
@@ -2457,129 +2427,32 @@ async def my_withdrawals_handler(
     )
 
 
-@dp.message()
-async def withdrawal_message_handler(
-    message: Message
-):
-    user_id = message.from_user.id
-
-    state = games.get(user_id)
-
-    if not state:
-        return
-
-    if state.get("withdraw_action") == "amount":
-
-        text = (
-            message.text or ""
-        ).strip()
-
-        try:
-            amount = int(text)
-
-            if amount < MIN_WITHDRAWAL:
-                raise ValueError
-
-        except Exception:
-            await message.answer(
-                "❌ Некорректная сумма.\n\n"
-                f"Минимальный вывод: "
-                f"<b>{money(MIN_WITHDRAWAL)} ₽</b>"
-            )
-            return
-
-        balance = get_balance(user_id)
-
-        if amount > balance:
-            await message.answer(
-                "❌ Недостаточно средств.\n\n"
-                f"💰 Ваш баланс: "
-                f"<b>{money(balance)} ₽</b>"
-            )
-            return
-
-        games[user_id] = {
-            "withdraw_action": "destination",
-            "withdraw_amount": amount
-        }
-
-        await message.answer(
-            "💳 <b>РЕКВИЗИТЫ ДЛЯ ВЫВОДА</b>\n\n"
-            f"💰 Сумма: <b>{money(amount)} ₽</b>\n\n"
-            "Отправьте реквизиты, на которые "
-            "нужно выполнить выплату.\n\n"
-            "Например, адрес кошелька USDT TRC20."
-        )
-
-        return
-
-    if state.get("withdraw_action") == "destination":
-
-        destination = (
-            message.text or ""
-        ).strip()
-
-        if len(destination) < 5:
-            await message.answer(
-                "❌ Реквизиты слишком короткие.\n"
-                "Проверьте и отправьте ещё раз."
-            )
-            return
-
-        amount = state.get(
-            "withdraw_amount"
-        )
-
-        if not amount:
-            games.pop(
-                user_id,
-                None
-            )
-
-            await message.answer(
-                "❌ Заявка устарела.\n"
-                "Создайте вывод заново."
-            )
-            return
-
-        withdrawal = create_withdrawal(
-            user_id=user_id,
-            amount_rub=amount,
-            method="manual",
-            destination=destination
-        )
-
-        if withdrawal is None:
-            games.pop(
-                user_id,
-                None
-            )
-
-            await message.answer(
-                "❌ Не удалось создать заявку.\n\n"
-                "Возможно, недостаточно средств."
-            )
-            return
-
-        games.pop(
-            user_id,
-            None
-        )
-
-        await message.answer(
-            "✅ <b>ЗАЯВКА НА ВЫВОД СОЗДАНА</b>\n\n"
-            f"🧾 Номер: <b>#{withdrawal['id']}</b>\n"
-            f"💰 Сумма: <b>{money(amount)} ₽</b>\n"
-            "⏳ Статус: <b>ОЖИДАЕТ ПРОВЕРКИ</b>\n\n"
-            "Средства зарезервированы до решения "
-            "администратора.\n\n"
-            "После проверки вы получите уведомление."
-        )
-
-        return
 # =========================================================
 # ADMIN PANEL
 # =========================================================
+
+def admin_main_keyboard():
+    builder = InlineKeyboardBuilder()
+
+    builder.button(
+        text="👤 НАЙТИ ПОЛЬЗОВАТЕЛЯ",
+        callback_data="admin_find_user"
+    )
+
+    builder.button(
+        text="💸 ЗАЯВКИ НА ВЫВОД",
+        callback_data="admin_withdrawals"
+    )
+
+    builder.button(
+        text="⬅️ ГЛАВНОЕ МЕНЮ",
+        callback_data="back_main"
+    )
+
+    builder.adjust(1)
+
+    return builder.as_markup()
+
 
 @dp.callback_query(F.data == "admin")
 async def admin_panel(callback: CallbackQuery):
@@ -2594,27 +2467,17 @@ async def admin_panel(callback: CallbackQuery):
 
     await callback.answer()
 
-    builder = InlineKeyboardBuilder()
-
-    builder.button(
-        text="👤 НАЙТИ ПОЛЬЗОВАТЕЛЯ",
-        callback_data="admin_find_user"
-    )
-
-    builder.button(
-        text="⬅️ ГЛАВНОЕ МЕНЮ",
-        callback_data="back_main"
-    )
-
-    builder.adjust(1)
-
     await edit_or_answer(
         callback,
         "🛠 <b>ADMIN PANEL</b>\n\n"
         "Выбери действие:",
-        builder.as_markup()
+        admin_main_keyboard()
     )
 
+
+# =========================================================
+# ADMIN FIND USER
+# =========================================================
 
 @dp.callback_query(F.data == "admin_find_user")
 async def admin_find_user(callback: CallbackQuery):
@@ -2639,38 +2502,7 @@ async def admin_find_user(callback: CallbackQuery):
     )
 
 
-@dp.message()
-async def admin_text_handler(message: Message):
-    user_id = message.from_user.id
-
-    state = games.get(user_id)
-
-    if not state:
-        return
-
-    if state.get("admin_action") != "find_user":
-        return
-
-    if not is_admin(user_id):
-        return
-
-    try:
-        target_id = int(
-            message.text.strip()
-        )
-    except Exception:
-        await message.answer(
-            "❌ ID должен быть числом."
-        )
-        return
-
-    games[user_id] = {
-        "admin_action": "user_menu",
-        "target_user": target_id
-    }
-
-    balance = get_balance(target_id)
-
+def admin_user_keyboard():
     builder = InlineKeyboardBuilder()
 
     builder.button(
@@ -2705,13 +2537,31 @@ async def admin_text_handler(message: Message):
 
     builder.adjust(1)
 
+    return builder.as_markup()
+
+
+async def show_admin_user(
+    message: Message,
+    target_id: int
+):
+    balance = get_balance(target_id)
+
+    games[message.from_user.id] = {
+        "admin_action": "user_menu",
+        "target_user": target_id
+    }
+
     await message.answer(
         "👤 <b>ПОЛЬЗОВАТЕЛЬ</b>\n\n"
         f"ID: <code>{target_id}</code>\n"
         f"💰 Баланс: <b>{money(balance)} ₽</b>",
-        reply_markup=builder.as_markup()
+        reply_markup=admin_user_keyboard()
     )
 
+
+# =========================================================
+# ADMIN BALANCE
+# =========================================================
 
 @dp.callback_query(
     F.data.in_(
@@ -2791,6 +2641,10 @@ async def admin_refresh(callback: CallbackQuery):
     )
 
 
+# =========================================================
+# ADMIN GAME HISTORY
+# =========================================================
+
 @dp.callback_query(F.data == "admin_game_history")
 async def admin_game_history(callback: CallbackQuery):
     user_id = callback.from_user.id
@@ -2846,6 +2700,11 @@ async def admin_game_history(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
 
     builder.button(
+        text="👤 К ПОЛЬЗОВАТЕЛЮ",
+        callback_data="admin_user_back"
+    )
+
+    builder.button(
         text="🛠 ADMIN PANEL",
         callback_data="admin"
     )
@@ -2856,6 +2715,10 @@ async def admin_game_history(callback: CallbackQuery):
         builder.as_markup()
     )
 
+
+# =========================================================
+# ADMIN PAYMENT HISTORY
+# =========================================================
 
 @dp.callback_query(F.data == "admin_payment_history")
 async def admin_payment_history(callback: CallbackQuery):
@@ -2906,6 +2769,11 @@ async def admin_payment_history(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
 
     builder.button(
+        text="👤 К ПОЛЬЗОВАТЕЛЮ",
+        callback_data="admin_user_back"
+    )
+
+    builder.button(
         text="🛠 ADMIN PANEL",
         callback_data="admin"
     )
@@ -2917,83 +2785,801 @@ async def admin_payment_history(callback: CallbackQuery):
     )
 
 
+@dp.callback_query(F.data == "admin_user_back")
+async def admin_user_back(callback: CallbackQuery):
+    user_id = callback.from_user.id
+
+    if not is_admin(user_id):
+        await callback.answer(
+            "Нет доступа",
+            show_alert=True
+        )
+        return
+
+    state = games.get(user_id)
+
+    if not state or "target_user" not in state:
+        await callback.answer(
+            "Пользователь не выбран",
+            show_alert=True
+        )
+        return
+
+    target_id = state["target_user"]
+
+    await callback.answer()
+
+    await edit_or_answer(
+        callback,
+        "👤 <b>ПОЛЬЗОВАТЕЛЬ</b>\n\n"
+        f"ID: <code>{target_id}</code>\n"
+        f"💰 Баланс: <b>{money(get_balance(target_id))} ₽</b>",
+        admin_user_keyboard()
+    )
+
+
 # =========================================================
-# ADMIN AMOUNT INPUT
+# ADMIN WITHDRAWALS
 # =========================================================
 
-@dp.message()
-async def admin_amount_handler(message: Message):
+def admin_withdrawal_list_keyboard(
+    withdrawals
+):
+    builder = InlineKeyboardBuilder()
+
+    for item in withdrawals:
+        builder.button(
+            text=(
+                f"#{item['id']} — "
+                f"{money(item['amount_rub'])} ₽"
+            ),
+            callback_data=f"admin_withdraw_{item['id']}"
+        )
+
+    builder.button(
+        text="⬅️ ADMIN PANEL",
+        callback_data="admin"
+    )
+
+    builder.adjust(1)
+
+    return builder.as_markup()
+
+
+@dp.callback_query(F.data == "admin_withdrawals")
+async def admin_withdrawals(callback: CallbackQuery):
+    user_id = callback.from_user.id
+
+    if not is_admin(user_id):
+        await callback.answer(
+            "Нет доступа",
+            show_alert=True
+        )
+        return
+
+    await callback.answer()
+
+    withdrawals = get_withdrawals(20)
+
+    if not withdrawals:
+        await edit_or_answer(
+            callback,
+            "💸 <b>ЗАЯВКИ НА ВЫВОД</b>\n\n"
+            "Ожидающих заявок нет.",
+            admin_main_keyboard()
+        )
+        return
+
+    lines = [
+        "💸 <b>ЗАЯВКИ НА ВЫВОД</b>\n",
+        "Выбери заявку:"
+    ]
+
+    await edit_or_answer(
+        callback,
+        "\n".join(lines),
+        admin_withdrawal_list_keyboard(withdrawals)
+    )
+
+
+def admin_withdrawal_keyboard(withdrawal):
+    builder = InlineKeyboardBuilder()
+
+    status = withdrawal.get("status")
+
+    if status == "pending":
+        builder.button(
+            text="✅ ПОДТВЕРДИТЬ",
+            callback_data=(
+                f"approve_withdraw_{withdrawal['id']}"
+            )
+        )
+
+        builder.button(
+            text="❌ ОТКЛОНИТЬ",
+            callback_data=(
+                f"reject_withdraw_{withdrawal['id']}"
+            )
+        )
+
+    elif status == "approved":
+        builder.button(
+            text="💸 ВЫПЛАТА ОТПРАВЛЕНА",
+            callback_data=(
+                f"paid_withdraw_{withdrawal['id']}"
+            )
+        )
+
+    builder.button(
+        text="⬅️ К ЗАЯВКАМ",
+        callback_data="admin_withdrawals"
+    )
+
+    builder.button(
+        text="🛠 ADMIN PANEL",
+        callback_data="admin"
+    )
+
+    builder.adjust(1)
+
+    return builder.as_markup()
+
+
+@dp.callback_query(
+    F.data.startswith("admin_withdraw_")
+)
+async def admin_withdrawal_view(
+    callback: CallbackQuery
+):
+    user_id = callback.from_user.id
+
+    if not is_admin(user_id):
+        await callback.answer(
+            "Нет доступа",
+            show_alert=True
+        )
+        return
+
+    try:
+        withdrawal_id = int(
+            callback.data.split("_")[-1]
+        )
+    except Exception:
+        await callback.answer(
+            "Ошибка заявки",
+            show_alert=True
+        )
+        return
+
+    withdrawal = get_withdrawal(
+        withdrawal_id
+    )
+
+    if not withdrawal:
+        await callback.answer(
+            "Заявка не найдена",
+            show_alert=True
+        )
+        return
+
+    await callback.answer()
+
+    status_names = {
+        "pending": "⏳ ОЖИДАЕТ",
+        "approved": "✅ ПОДТВЕРЖДЕНА",
+        "rejected": "❌ ОТКЛОНЕНА",
+        "paid": "💸 ВЫПЛАЧЕНА",
+    }
+
+    status = status_names.get(
+        withdrawal.get("status"),
+        withdrawal.get("status")
+    )
+
+    destination = (
+        withdrawal.get("destination")
+        or withdrawal.get("payout_details")
+        or "Не указаны"
+    )
+
+    method = (
+        withdrawal.get("method")
+        or "manual"
+    )
+
+    text = (
+        "💸 <b>ЗАЯВКА НА ВЫВОД</b>\n\n"
+        f"🧾 Номер: <b>#{withdrawal['id']}</b>\n"
+        f"👤 User ID: <code>{withdrawal['user_id']}</code>\n"
+        f"💰 Сумма: <b>{money(withdrawal['amount_rub'])} ₽</b>\n"
+        f"💳 Метод: <b>{method}</b>\n"
+        f"📍 Реквизиты:\n"
+        f"<code>{destination}</code>\n\n"
+        f"📌 Статус: <b>{status}</b>"
+    )
+
+    await edit_or_answer(
+        callback,
+        text,
+        admin_withdrawal_keyboard(withdrawal)
+    )
+
+
+# =========================================================
+# ADMIN APPROVE WITHDRAWAL
+# =========================================================
+
+@dp.callback_query(
+    F.data.startswith("approve_withdraw_")
+)
+async def admin_approve_withdrawal(
+    callback: CallbackQuery
+):
+    user_id = callback.from_user.id
+
+    if not is_admin(user_id):
+        await callback.answer(
+            "Нет доступа",
+            show_alert=True
+        )
+        return
+
+    try:
+        withdrawal_id = int(
+            callback.data.split("_")[-1]
+        )
+    except Exception:
+        await callback.answer(
+            "Ошибка заявки",
+            show_alert=True
+        )
+        return
+
+    withdrawal = get_withdrawal(
+        withdrawal_id
+    )
+
+    if not withdrawal:
+        await callback.answer(
+            "Заявка не найдена",
+            show_alert=True
+        )
+        return
+
+    if withdrawal.get("status") != "pending":
+        await callback.answer(
+            "Заявка уже обработана",
+            show_alert=True
+        )
+        return
+
+    result = approve_withdrawal(
+        withdrawal_id
+    )
+
+    if result is None:
+        await callback.answer(
+            "Не удалось подтвердить заявку",
+            show_alert=True
+        )
+        return
+
+    withdrawal = get_withdrawal(
+        withdrawal_id
+    )
+
+    try:
+        await bot.send_message(
+            withdrawal["user_id"],
+            "✅ <b>ВЫВОД ПОДТВЕРЖДЁН</b>\n\n"
+            f"🧾 Заявка: <b>#{withdrawal_id}</b>\n"
+            f"💰 Сумма: <b>{money(withdrawal['amount_rub'])} ₽</b>\n\n"
+            "Заявка подтверждена администратором.\n"
+            "Выплата будет выполнена вручную."
+        )
+    except Exception as error:
+        print(
+            "WITHDRAW APPROVE USER NOTIFICATION ERROR:",
+            repr(error)
+        )
+
+    await callback.answer(
+        "Заявка подтверждена"
+    )
+
+    await admin_withdrawal_view(
+        callback
+    )
+
+
+# =========================================================
+# ADMIN REJECT WITHDRAWAL
+# =========================================================
+
+@dp.callback_query(
+    F.data.startswith("reject_withdraw_")
+)
+async def admin_reject_withdrawal(
+    callback: CallbackQuery
+):
+    user_id = callback.from_user.id
+
+    if not is_admin(user_id):
+        await callback.answer(
+            "Нет доступа",
+            show_alert=True
+        )
+        return
+
+    try:
+        withdrawal_id = int(
+            callback.data.split("_")[-1]
+        )
+    except Exception:
+        await callback.answer(
+            "Ошибка заявки",
+            show_alert=True
+        )
+        return
+
+    withdrawal = get_withdrawal(
+        withdrawal_id
+    )
+
+    if not withdrawal:
+        await callback.answer(
+            "Заявка не найдена",
+            show_alert=True
+        )
+        return
+
+    if withdrawal.get("status") != "pending":
+        await callback.answer(
+            "Заявка уже обработана",
+            show_alert=True
+        )
+        return
+
+    result = reject_withdrawal(
+        withdrawal_id
+    )
+
+    if result is None:
+        await callback.answer(
+            "Не удалось отклонить заявку",
+            show_alert=True
+        )
+        return
+
+    withdrawal = get_withdrawal(
+        withdrawal_id
+    )
+
+    try:
+        await bot.send_message(
+            withdrawal["user_id"],
+            "❌ <b>ВЫВОД ОТКЛОНЁН</b>\n\n"
+            f"🧾 Заявка: <b>#{withdrawal_id}</b>\n"
+            f"💰 Сумма: <b>{money(withdrawal['amount_rub'])} ₽</b>\n\n"
+            "Заявка отклонена.\n"
+            "Зарезервированные средства возвращены на баланс."
+        )
+    except Exception as error:
+        print(
+            "WITHDRAW REJECT USER NOTIFICATION ERROR:",
+            repr(error)
+        )
+
+    await callback.answer(
+        "Заявка отклонена, средства возвращены"
+    )
+
+    await admin_withdrawal_view(
+        callback
+    )
+
+
+# =========================================================
+# ADMIN MARK WITHDRAWAL AS PAID
+# =========================================================
+
+@dp.callback_query(
+    F.data.startswith("paid_withdraw_")
+)
+async def admin_paid_withdrawal(
+    callback: CallbackQuery
+):
+    user_id = callback.from_user.id
+
+    if not is_admin(user_id):
+        await callback.answer(
+            "Нет доступа",
+            show_alert=True
+        )
+        return
+
+    try:
+        withdrawal_id = int(
+            callback.data.split("_")[-1]
+        )
+    except Exception:
+        await callback.answer(
+            "Ошибка заявки",
+            show_alert=True
+        )
+        return
+
+    withdrawal = get_withdrawal(
+        withdrawal_id
+    )
+
+    if not withdrawal:
+        await callback.answer(
+            "Заявка не найдена",
+            show_alert=True
+        )
+        return
+
+    if withdrawal.get("status") != "approved":
+        await callback.answer(
+            "Сначала подтвердите заявку",
+            show_alert=True
+        )
+        return
+
+    # Эта функция должна переводить approved -> paid.
+    # Если текущий database.py её ещё не содержит,
+    # добавим её следующим шагом.
+    try:
+        from database import complete_withdrawal
+
+        result = complete_withdrawal(
+            withdrawal_id
+        )
+
+    except Exception as error:
+        print(
+            "COMPLETE WITHDRAWAL ERROR:",
+            repr(error)
+        )
+
+        await callback.answer(
+            "Функция выплаты ещё не настроена",
+            show_alert=True
+        )
+        return
+
+    if result is None:
+        await callback.answer(
+            "Не удалось завершить заявку",
+            show_alert=True
+        )
+        return
+
+    withdrawal = get_withdrawal(
+        withdrawal_id
+    )
+
+    try:
+        await bot.send_message(
+            withdrawal["user_id"],
+            "💸 <b>ВЫПЛАТА ОТПРАВЛЕНА</b>\n\n"
+            f"🧾 Заявка: <b>#{withdrawal_id}</b>\n"
+            f"💰 Сумма: <b>{money(withdrawal['amount_rub'])} ₽</b>\n\n"
+            "Выплата отмечена администратором как выполненная."
+        )
+    except Exception as error:
+        print(
+            "WITHDRAW PAID USER NOTIFICATION ERROR:",
+            repr(error)
+        )
+
+    await callback.answer(
+        "Выплата отмечена как выполненная"
+    )
+
+    await admin_withdrawal_view(
+        callback
+    )
+
+
+# =========================================================
+# WITHDRAWAL MESSAGE INPUT
+# =========================================================
+
+async def handle_withdrawal_message(
+    message: Message,
+    state: dict
+):
+    user_id = message.from_user.id
+
+    if state.get("withdraw_action") == "amount":
+
+        text = (
+            message.text or ""
+        ).strip()
+
+        try:
+            amount = int(text)
+
+            if amount < MIN_WITHDRAWAL:
+                raise ValueError
+
+        except Exception:
+            await message.answer(
+                "❌ Некорректная сумма.\n\n"
+                f"Минимальный вывод: "
+                f"<b>{money(MIN_WITHDRAWAL)} ₽</b>"
+            )
+            return True
+
+        balance = get_balance(user_id)
+
+        if amount > balance:
+            await message.answer(
+                "❌ Недостаточно средств.\n\n"
+                f"💰 Ваш баланс: "
+                f"<b>{money(balance)} ₽</b>"
+            )
+            return True
+
+        games[user_id] = {
+            "withdraw_action": "destination",
+            "withdraw_amount": amount
+        }
+
+        await message.answer(
+            "💳 <b>РЕКВИЗИТЫ ДЛЯ ВЫВОДА</b>\n\n"
+            f"💰 Сумма: <b>{money(amount)} ₽</b>\n\n"
+            "Отправьте реквизиты, на которые "
+            "нужно выполнить выплату.\n\n"
+            "Например, адрес кошелька USDT TRC20."
+        )
+
+        return True
+
+    if state.get("withdraw_action") == "destination":
+
+        destination = (
+            message.text or ""
+        ).strip()
+
+        if len(destination) < 5:
+            await message.answer(
+                "❌ Реквизиты слишком короткие.\n"
+                "Проверьте и отправьте ещё раз."
+            )
+            return True
+
+        amount = state.get(
+            "withdraw_amount"
+        )
+
+        if not amount:
+            games.pop(
+                user_id,
+                None
+            )
+
+            await message.answer(
+                "❌ Заявка устарела.\n"
+                "Создайте вывод заново."
+            )
+            return True
+
+        try:
+            withdrawal = create_withdrawal(
+                user_id=user_id,
+                amount_rub=amount,
+                method="manual",
+                destination=destination
+            )
+        except Exception as error:
+            print(
+                "CREATE WITHDRAWAL ERROR:",
+                repr(error)
+            )
+
+            withdrawal = None
+
+        if withdrawal is None:
+            games.pop(
+                user_id,
+                None
+            )
+
+            await message.answer(
+                "❌ Не удалось создать заявку.\n\n"
+                "Возможно, недостаточно средств."
+            )
+            return True
+
+        games.pop(
+            user_id,
+            None
+        )
+
+        await message.answer(
+            "✅ <b>ЗАЯВКА НА ВЫВОД СОЗДАНА</b>\n\n"
+            f"🧾 Номер: <b>#{withdrawal['id']}</b>\n"
+            f"💰 Сумма: <b>{money(amount)} ₽</b>\n"
+            "⏳ Статус: <b>ОЖИДАЕТ ПРОВЕРКИ</b>\n\n"
+            "Средства зарезервированы до решения "
+            "администратора.\n\n"
+            "После проверки вы получите уведомление."
+        )
+
+        # Уведомляем администратора о новой заявке.
+        try:
+            await bot.send_message(
+                8244079903,
+                "💸 <b>НОВАЯ ЗАЯВКА НА ВЫВОД</b>\n\n"
+                f"🧾 Заявка: <b>#{withdrawal['id']}</b>\n"
+                f"👤 User ID: <code>{user_id}</code>\n"
+                f"💰 Сумма: <b>{money(amount)} ₽</b>\n\n"
+                "Открой ADMIN PANEL → ЗАЯВКИ НА ВЫВОД."
+            )
+        except Exception as error:
+            print(
+                "ADMIN WITHDRAW NOTIFICATION ERROR:",
+                repr(error)
+            )
+
+        return True
+
+    return False
+
+
+# =========================================================
+# ADMIN MESSAGE INPUT
+# =========================================================
+
+async def handle_admin_message(
+    message: Message,
+    state: dict
+):
     user_id = message.from_user.id
 
     if not is_admin(user_id):
-        return
+        return False
+
+    action = state.get("admin_action")
+
+    if action == "find_user":
+
+        text = (
+            message.text or ""
+        ).strip()
+
+        try:
+            target_id = int(text)
+        except Exception:
+            await message.answer(
+                "❌ ID должен быть числом."
+            )
+            return True
+
+        await show_admin_user(
+            message,
+            target_id
+        )
+
+        return True
+
+    if action == "amount":
+
+        text = (
+            message.text or ""
+        ).strip()
+
+        try:
+            amount = int(text)
+
+            if amount <= 0:
+                raise ValueError
+
+        except Exception:
+            await message.answer(
+                "❌ Введи положительное целое число."
+            )
+            return True
+
+        target_id = state["target_user"]
+        amount_action = state["admin_amount_action"]
+
+        if amount_action == "add":
+
+            new_balance = change_balance(
+                target_id,
+                amount
+            )
+
+            await message.answer(
+                "✅ <b>БАЛАНС ВЫДАН</b>\n\n"
+                f"👤 ID: <code>{target_id}</code>\n"
+                f"💰 +{money(amount)} ₽\n"
+                f"💳 Новый баланс: "
+                f"<b>{money(new_balance)} ₽</b>",
+                reply_markup=admin_user_keyboard()
+            )
+
+        else:
+
+            success = subtract_balance(
+                target_id,
+                amount
+            )
+
+            if not success:
+                await message.answer(
+                    "❌ Недостаточно средств "
+                    "на балансе пользователя."
+                )
+                return True
+
+            new_balance = get_balance(
+                target_id
+            )
+
+            await message.answer(
+                "✅ <b>БАЛАНС СНЯТ</b>\n\n"
+                f"👤 ID: <code>{target_id}</code>\n"
+                f"➖ {money(amount)} ₽\n"
+                f"💳 Новый баланс: "
+                f"<b>{money(new_balance)} ₽</b>",
+                reply_markup=admin_user_keyboard()
+            )
+
+        games[user_id] = {
+            "admin_action": "user_menu",
+            "target_user": target_id
+        }
+
+        return True
+
+    return False
+
+
+# =========================================================
+# SINGLE MESSAGE HANDLER
+# =========================================================
+#
+# ВАЖНО:
+# Раньше здесь было два @dp.message().
+# Первый мог перехватывать сообщения второго.
+#
+# Теперь используется ОДИН обработчик.
+# =========================================================
+
+@dp.message()
+async def text_message_handler(message: Message):
+    user_id = message.from_user.id
 
     state = games.get(user_id)
 
     if not state:
         return
 
-    if state.get("admin_action") != "amount":
-        return
-
-    try:
-        amount = int(
-            message.text.strip()
+    # Сначала проверяем состояние пользователя,
+    # связанное с выводом.
+    if state.get("withdraw_action"):
+        handled = await handle_withdrawal_message(
+            message,
+            state
         )
 
-        if amount <= 0:
-            raise ValueError
-
-    except Exception:
-        await message.answer(
-            "❌ Введи положительное целое число."
-        )
-        return
-
-    target_id = state["target_user"]
-    action = state["admin_amount_action"]
-
-    if action == "add":
-        new_balance = change_balance(
-            target_id,
-            amount
-        )
-
-        await message.answer(
-            "✅ <b>БАЛАНС ВЫДАН</b>\n\n"
-            f"👤 ID: <code>{target_id}</code>\n"
-            f"💰 +{money(amount)} ₽\n"
-            f"💳 Новый баланс: <b>{money(new_balance)} ₽</b>"
-        )
-
-    else:
-        success = subtract_balance(
-            target_id,
-            amount
-        )
-
-        if not success:
-            await message.answer(
-                "❌ Недостаточно средств "
-                "на балансе пользователя."
-            )
+        if handled:
             return
 
-        new_balance = get_balance(
-            target_id
+    # Затем проверяем состояние администратора.
+    if state.get("admin_action"):
+        handled = await handle_admin_message(
+            message,
+            state
         )
 
-        await message.answer(
-            "✅ <b>БАЛАНС СНЯТ</b>\n\n"
-            f"👤 ID: <code>{target_id}</code>\n"
-            f"➖ {money(amount)} ₽\n"
-            f"💳 Новый баланс: <b>{money(new_balance)} ₽</b>"
-        )
-
-    games[user_id] = {
-        "admin_action": "user_menu",
-        "target_user": target_id
-    }
+        if handled:
+            return
 
 
 # =========================================================
