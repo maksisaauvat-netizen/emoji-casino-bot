@@ -61,6 +61,34 @@ async def start_image():
             return FileResponse(path)
     raise HTTPException(status_code=404, detail="Start image not found")
 
+@app.get("/custom-emoji/{emoji_id}")
+async def custom_emoji(emoji_id: str):
+    """Proxy a Telegram custom emoji sticker so the Mini App can display premium emoji by ID."""
+    import aiohttp
+    from fastapi.responses import Response
+    if not emoji_id.isdigit():
+        raise HTTPException(status_code=400, detail="Invalid custom emoji id")
+    api=f"https://api.telegram.org/bot{BOT_TOKEN}"
+    timeout=aiohttp.ClientTimeout(total=10)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.post(api + "/getCustomEmojiStickers", json={"custom_emoji_ids":[emoji_id]}) as r:
+            data=await r.json()
+        stickers=data.get("result") or []
+        if not stickers:
+            raise HTTPException(status_code=404, detail="Custom emoji not found")
+        file_id=stickers[0].get("file_id")
+        async with session.post(api + "/getFile", json={"file_id":file_id}) as r:
+            fd=await r.json()
+        file_path=(fd.get("result") or {}).get("file_path")
+        if not file_path:
+            raise HTTPException(status_code=404, detail="Custom emoji file not found")
+        async with session.get(f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}") as r:
+            if r.status != 200:
+                raise HTTPException(status_code=502, detail="Unable to fetch custom emoji")
+            body=await r.read()
+            content_type=r.headers.get("Content-Type", "image/webp")
+    return Response(content=body, media_type=content_type, headers={"Cache-Control":"public, max-age=86400"})
+
 @app.get("/upgrader_spin.gif")
 @app.get("/assets/upgrader_spin.gif")
 async def upgrader_gif():
@@ -77,6 +105,8 @@ UPGRADE_HOUSE_EDGE = float(os.getenv("UPGRADE_HOUSE_EDGE", "0.04"))
 UPGRADE_GIF = Path(os.getenv("UPGRADE_GIF", str(ROOT_DIR / "upgrader_spin.gif")))
 START_IMAGE = Path(os.getenv("START_IMAGE", str(ROOT_DIR / "start.jpg")))
 HELP_USERNAME = os.getenv("HELP_USERNAME", "narotan7").lstrip("@")
+# Premium custom emoji used as the currency/amount marker in bot messages.
+M = "<tg-emoji emoji-id='5231449120635370684'>₽</tg-emoji>"
 BOT_USERNAME = os.getenv("BOT_USERNAME", "").lstrip("@")
 upgrade_sessions: dict[int, dict] = {}
 bot_sessions: dict[int, dict] = {}
@@ -384,11 +414,11 @@ async def root():
 @app.get("/api/config")
 async def config():
     return {"games":[
-        {"id":"slot","name":"SLOT","icon":"🎰"},
-        {"id":"x50","name":"x50","icon":"🎡"},
-        {"id":"crash","name":"CRASH","icon":"🚀"},
+        {"id":"slot","name":"SLOT","icon":"<tg-emoji emoji-id='5384509325429463744'>🎰</tg-emoji>"},
+        {"id":"x50","name":"x50","icon":"<tg-emoji emoji-id='5382150533685469668'>🎡</tg-emoji>"},
+        {"id":"crash","name":"CRASH","icon":"<tg-emoji emoji-id='5426896125745471534'>🚀</tg-emoji>"},
         {"id":"dice","name":"DICE","icon":"🎲"},
-        {"id":"mines","name":"Mines","icon":"💣"},
+        {"id":"mines","name":"Mines","icon":"<tg-emoji emoji-id='5280569974404966639'>💣</tg-emoji>"},
         {"id":"upgrader","name":"Upgrader","icon":"⚡"},
     ], "real_economy": REAL_ECONOMY,
         "upgrader": {"preset_multipliers": [2,5,10], "preset_percentages": [35,70], "custom_percent_min": 1, "custom_percent_max": 80, "house_edge": UPGRADE_HOUSE_EDGE}}
@@ -754,33 +784,33 @@ def _profile_text(uid: int) -> str:
     s=get_user_stats(uid); b=get_balance(uid)
     return (
         "╭────────────────────╮\n"
-        "       👤 | PROFILE\n"
+        "       <tg-emoji emoji-id='5116116063188157350'>👤</tg-emoji> | PROFILE\n"
         "╰────────────────────╯\n\n"
         f"🆔 ID: <code>{uid}</code>\n\n"
-        f"💰 | BALANCE:\n└ ‘{b:,} ₽’\n\n"
-        f"🎮 | ИГРЫ\n└ ‘{s['games']}’\n\n"
-        f"🏆 | ПОБЕДЫ\n└ ‘{s['wins']}’\n\n"
-        f"❌ | ПОРАЖЕНИЯ\n└ ‘{s['losses']}’\n\n"
-        f"📈 | WINRATE\n└ ‘{s['winrate']}%’\n\n"
-        f"💵 | СТАВКИ\n└ ‘{s['turnover']:,} ₽’\n\n"
-        f"🏆 | ВЫИГРАНО\n└ ‘{s['payouts']:,} ₽’\n\n"
-        f"🔥 | MAX WIN\n└ ‘{s['max_win']:,} ₽’"
+        f"<tg-emoji emoji-id='5278467510604160626'>💰</tg-emoji> | BALANCE:\n└ ‘{b:,} <tg-emoji emoji-id='5231449120635370684'>₽</tg-emoji>’\n\n"
+        f"<tg-emoji emoji-id='5426896538062332283'>🎮</tg-emoji> | ИГРЫ\n└ ‘{s['games']}’\n\n"
+        f"<tg-emoji emoji-id='5188344996356448758'>🏆</tg-emoji> | ПОБЕДЫ\n└ ‘{s['wins']}’\n\n"
+        f"<tg-emoji emoji-id='5454350746407419714'>❌</tg-emoji> | ПОРАЖЕНИЯ\n└ ‘{s['losses']}’\n\n"
+        f"<tg-emoji emoji-id='5429651785352501917'>📈</tg-emoji> | WINRATE\n└ ‘{s['winrate']}%’\n\n"
+        f"💵 | СТАВКИ\n└ ‘{s['turnover']:,} <tg-emoji emoji-id='5231449120635370684'>₽</tg-emoji>’\n\n"
+        f"<tg-emoji emoji-id='5188344996356448758'>🏆</tg-emoji> | ВЫИГРАНО\n└ ‘{s['payouts']:,} <tg-emoji emoji-id='5231449120635370684'>₽</tg-emoji>’\n\n"
+        f"<tg-emoji emoji-id='5375452661036358740'>🔥</tg-emoji> | MAX WIN\n└ ‘{s['max_win']:,} <tg-emoji emoji-id='5231449120635370684'>₽</tg-emoji>’"
     ).replace(",", " ")
 
 def _wallet_text(uid: int) -> str:
     b=get_balance(uid); s=get_user_stats(uid)
     return (
         "╭────────────────────╮\n"
-        "       💰 | WALLET\n"
+        "       <tg-emoji emoji-id='5278467510604160626'>💰</tg-emoji> | WALLET\n"
         "╰────────────────────╯\n\n"
-        f"Баланс: <b>{b:,} ₽</b>\n"
-        f"Оборот: <b>{s['turnover']:,} ₽</b>\n\n"
+        f"Баланс: <b>{b:,} {M}</b>\n"
+        f"Оборот: <b>{s['turnover']:,} {M}</b>\n\n"
         "Пополнение и вывод доступны через меню ниже."
     ).replace(",", " ")
 
 def _games_text() -> str:
-    return ("╭────────────────────╮\n       🎰 GAMES\n╰────────────────────╯\n\n"
-            "🎰 • Играть в приложении\n\nВыберите режим игры:")
+    return ("╭────────────────────╮\n       <tg-emoji emoji-id='5384509325429463744'>🎰</tg-emoji> GAMES\n╰────────────────────╯\n\n"
+            "<tg-emoji emoji-id='5384509325429463744'>🎰</tg-emoji> • Играть в приложении\n\nВыберите режим игры:")
 
 @dp.message(CommandStart())
 async def start_handler(message: Message):
@@ -789,7 +819,7 @@ async def start_handler(message: Message):
     ensure_user(uid); log_event(uid, "bot_start")
     caption=(
         "╔══════════════════════╗\n"
-        "      🎰 RESONANT\n"
+        "      <tg-emoji emoji-id='5384509325429463744'>🎰</tg-emoji> RESONANT\n"
         "        CASINO\n"
         "╚══════════════════════╝"
     )
@@ -808,7 +838,7 @@ async def menu_callbacks(callback: CallbackQuery):
         await callback.message.answer("Введите Telegram ID пользователя.")
         await callback.answer(); return
     if action=="home":
-        await _edit_menu(callback, "╔══════════════════════╗\n      🎰 RESONANT\n        CASINO\n╚══════════════════════╝", _menu_keyboard(uid))
+        await _edit_menu(callback, "╔══════════════════════╗\n      <tg-emoji emoji-id='5384509325429463744'>🎰</tg-emoji> RESONANT\n        CASINO\n╚══════════════════════╝", _menu_keyboard(uid))
     elif action=="profile":
         await _edit_menu(callback, _profile_text(uid), _profile_keyboard(uid))
     elif action=="wallet":
@@ -829,7 +859,7 @@ async def profile_callbacks(callback: CallbackQuery):
     uid=callback.from_user.id; action=callback.data.split(":",1)[1]
     if action=="games":
         rows=get_game_history(uid,10)
-        text="╭────────────────────╮\n       🎮 | ИСТОРИЯ ИГР\n╰────────────────────╯\n\n"
+        text="╭────────────────────╮\n       <tg-emoji emoji-id='5426896538062332283'>🎮</tg-emoji> | ИСТОРИЯ ИГР\n╰────────────────────╯\n\n"
         text += "\n".join(f"#{r['id']} {r['game']} · {r['stake']} ₽ · {r['result']} · {r['payout']} ₽" for r in rows) or "История пуста."
     else:
         code=f"ref_{uid}"
@@ -859,16 +889,17 @@ async def game_callbacks(callback: CallbackQuery):
     uid=callback.from_user.id; g=callback.data.split(":",1)[1]; ensure_user(uid)
     if g=="slot":
         bot_sessions[uid]={"step":"slot_amount"}
-        await callback.message.answer("╭────────────────────╮\n       🎰 SLOTS\n╰────────────────────╯\n\n💎 Ставка:\n\nМинимальная ставка: <b>10 ₽</b>\nМаксимальная ставка: <b>5000 ₽</b>\n\nОтправьте сумму одним сообщением.")
+        await callback.message.answer("╭────────────────────╮\n       <tg-emoji emoji-id='5384509325429463744'>🎰</tg-emoji> SLOTS\n╰────────────────────╯\n\n💎 Ставка:\n\nМинимальная ставка: <b>10 ₽</b>\nМаксимальная ставка: <b>5000 ₽</b>\n\nОтправьте сумму одним сообщением.")
     elif g=="mines":
         bot_sessions[uid]={"step":"mines_amount"}
-        await callback.message.answer("╭────────────────────╮\n       💣 MINES\n╰────────────────────╯\n\n💎 ВВЕДИТЕ СТАВКУ\n\nМинимальная ставка: <b>10 ₽</b>\nМаксимальная ставка: <b>5000 ₽</b>\n\nОтправьте сумму одним сообщением.\n\nНапример: <b>10</b>")
+        await callback.message.answer("╭────────────────────╮\n       <tg-emoji emoji-id='5280569974404966639'>💣</tg-emoji> MINES\n╰────────────────────╯\n\n💎 ВВЕДИТЕ СТАВКУ\n\nМинимальная ставка: <b>10 ₽</b>\nМаксимальная ставка: <b>5000 ₽</b>\n\nОтправьте сумму одним сообщением.\n\nНапример: <b>10</b>")
     elif g=="dice":
         await callback.message.answer("╭────────────────────╮\n       🎲 DICE\n╰────────────────────╯\n\nВыберите режим:",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Один бросок",callback_data="dice:one")],[InlineKeyboardButton(text="Два броска",callback_data="dice:two")],[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]]))
     elif g=="upgrader":
         upgrade_sessions[uid]={"step":"amount"}; await callback.message.answer("⚡ UPGRADER\nВведите сумму ставки (10–5000 ₽).")
     elif g in {"crash","x50"}:
-        await callback.message.answer(f"╭────────────────────╮\n       {'🚀 CRASH' if g=='crash' else '🎡 x50'}\n╰────────────────────╯\n\nЭтот режим доступен в приложении.\nДля запуска откройте его через кнопку «🎰 • Играть в приложении» в разделе GAMES.",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]]))
+        game_title = "<tg-emoji emoji-id='5426896125745471534'>🚀</tg-emoji> CRASH" if g == "crash" else "<tg-emoji emoji-id='5382150533685469668'>🎡</tg-emoji> x50"
+        await callback.message.answer(f"╭────────────────────╮\n       {game_title}\n╰────────────────────╯\n\nЭтот режим доступен в приложении.\nДля запуска откройте его через кнопку «🎰 • Играть в приложении» в разделе GAMES.",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]]))
     else:
         await callback.message.answer("Неизвестная игра.",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]]))
     await callback.answer()
@@ -902,8 +933,8 @@ async def slot_confirm(callback: CallbackQuery):
     payout=int(round(stake*mult)) if mult else 0
     if payout: change_balance(uid,payout)
     record_game(uid,"slots_bot",stake,"win" if payout else "loss",mult,payout,rs["round_hash"],rs["server_seed"]); log_event(uid,"game_slots_bot",f"stake={stake} combo={combo} payout={payout}"); bot_sessions.pop(uid,None)
-    result=f"🎉 Выигрыш: <b>{payout} ₽</b>" if payout else "❌ Проигрыш"
-    await callback.message.answer(f"╭────────────────────╮\n       🎰 SLOTS\n╰────────────────────╯\n\n💎 Ставка: <b>{stake} ₽</b>\n\n<code>{combo}</code>\n\n{result}\n\nХэш раунда: <code>{rs['round_hash']}</code>\nServer seed: <code>{rs['server_seed']}</code>\n\n🍋🍋🍋 — ×10\n7️⃣7️⃣7️⃣ — ×50\n3 одинаковых — ×3.5\n2 одинаковых — ×1.85\nДругие комбинации — проигрыш.",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎰 Ещё раз",callback_data="game:slot")],[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]])); await callback.answer()
+    result=f"🎉 Выигрыш: <b>{payout} ₽</b>" if payout else "<tg-emoji emoji-id='5454350746407419714'>❌</tg-emoji> Проигрыш"
+    await callback.message.answer(f"╭────────────────────╮\n       <tg-emoji emoji-id='5384509325429463744'>🎰</tg-emoji> SLOTS\n╰────────────────────╯\n\n💎 Ставка: <b>{stake} ₽</b>\n\n<code>{combo}</code>\n\n{result}\n\nХэш раунда: <code>{rs['round_hash']}</code>\nServer seed: <code>{rs['server_seed']}</code>\n\n🍋🍋🍋 — ×10\n7️⃣7️⃣7️⃣ — ×50\n3 одинаковых — ×3.5\n2 одинаковых — ×1.85\nДругие комбинации — проигрыш.",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎰 Ещё раз",callback_data="game:slot")],[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]])); await callback.answer()
 
 def mines_bot_keyboard(opened):
     rows=[]
@@ -917,7 +948,7 @@ async def mines_callbacks(callback: CallbackQuery):
         s=bot_sessions.get(uid,{})
         if s.get("step")!="mines_count": await callback.answer("Сессия не найдена",show_alert=True); return
         s.update({"step":"mines_confirm","mines_count":int(parts[2])})
-        await callback.message.answer(f"💣 MINES\n\nСтавка: <b>{s['stake']} ₽</b>\nБомб: <b>{s['mines_count']}</b>\n\nПодтвердить ставку?",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подтвердить ставку",callback_data="minesconfirm:yes"),InlineKeyboardButton(text="Отмена",callback_data="minesconfirm:no")]]))
+        await callback.message.answer(f"<tg-emoji emoji-id='5280569974404966639'>💣</tg-emoji> MINES\n\nСтавка: <b>{s['stake']} ₽</b>\nБомб: <b>{s['mines_count']}</b>\n\nПодтвердить ставку?",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подтвердить ставку",callback_data="minesconfirm:yes"),InlineKeyboardButton(text="Отмена",callback_data="minesconfirm:no")]]))
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("minesconfirm:"))
@@ -930,7 +961,7 @@ async def mines_confirm(callback: CallbackQuery):
     rs=new_round("mines_bot",uid); pool=list(range(25))
     for i in range(24,0,-1): j=pf_index(rs,"mines",25,i)%(i+1); pool[i],pool[j]=pool[j],pool[i]
     bot_active_games[uid]={"type":"mines","stake":stake,"mines":pool[:mc],"opened":[],"multiplier":1.0,"round":rs}; bot_sessions.pop(uid,None)
-    await callback.message.answer("╭────────────────────╮\n       💣 MINES\n╰────────────────────╯\n\nОткройте клетку:",reply_markup=mines_bot_keyboard([])); await callback.answer()
+    await callback.message.answer("╭────────────────────╮\n       <tg-emoji emoji-id='5280569974404966639'>💣</tg-emoji> MINES\n╰────────────────────╯\n\nОткройте клетку:",reply_markup=mines_bot_keyboard([])); await callback.answer()
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("bmines:"))
 async def bot_mines_play(callback: CallbackQuery):
@@ -962,7 +993,7 @@ async def dice_confirm(callback: CallbackQuery):
     won=(total<3 if bet=="lt3" else total>3 if bet=="gt3" else total==7 if bet=="eq7" else total<7 if bet=="lt7" else total>7); mult=5.0 if bet=="eq7" else 1.85; payout=int(round(stake*mult)) if won else 0
     if payout: change_balance(uid,payout)
     record_game(uid,"dice_bot",stake,"win" if won else "loss",mult if won else 0,payout,rs["round_hash"],rs["server_seed"]); log_event(uid,"game_dice_bot",f"stake={stake} dice={d1},{d2} bet={bet} payout={payout}"); bot_sessions.pop(uid,None)
-    rolls=f"🎲 {d1}" if mode=="one" else f"🎲 {d1} + {d2} = <b>{total}</b>"; result=f"🎉 Выигрыш: <b>{payout} ₽</b>" if payout else "❌ Проигрыш"
+    rolls=f"🎲 {d1}" if mode=="one" else f"🎲 {d1} + {d2} = <b>{total}</b>"; result=f"🎉 Выигрыш: <b>{payout} ₽</b>" if payout else "<tg-emoji emoji-id='5454350746407419714'>❌</tg-emoji> Проигрыш"
     await callback.message.answer(f"╭────────────────────╮\n       🎲 DICE\n╰────────────────────╯\n\n{rolls}\n\n{result}\n\nХэш раунда: <code>{rs['round_hash']}</code>\nServer seed: <code>{rs['server_seed']}</code>",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎲 Ещё раз",callback_data="game:dice")],[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]])); await callback.answer()
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("admin:"))
@@ -1050,9 +1081,9 @@ async def upgrade_message_router(message: Message):
         except ValueError: amount=0
         if not 10<=amount<=5000: await message.answer("Сумма ставки должна быть от <b>10 ₽</b> до <b>5000 ₽</b>."); return
         if session["step"]=="slot_amount":
-            session.update({"step":"slot_confirm","stake":amount}); await message.answer(f"🎰 SLOTS\n\n💎 Ставка: <b>{amount} ₽</b>\n\nПодтвердить ставку?",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подтвердить ставку",callback_data="slotconfirm:yes"),InlineKeyboardButton(text="Отмена",callback_data="slotconfirm:cancel")]]))
+            session.update({"step":"slot_confirm","stake":amount}); await message.answer(f"<tg-emoji emoji-id='5384509325429463744'>🎰</tg-emoji> SLOTS\n\n💎 Ставка: <b>{amount} ₽</b>\n\nПодтвердить ставку?",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подтвердить ставку",callback_data="slotconfirm:yes"),InlineKeyboardButton(text="Отмена",callback_data="slotconfirm:cancel")]]))
         elif session["step"]=="mines_amount":
-            session.update({"step":"mines_count","stake":amount}); rows=[[InlineKeyboardButton(text=str(a),callback_data=f"mines:count:{a}") for a in range(2,14)],[InlineKeyboardButton(text=str(a),callback_data=f"mines:count:{a}") for a in range(14,25)]]; await message.answer(f"💣 MINES\n\n💎 Ставка: <b>{amount} ₽</b>\n\nВыберите количество бомб:",reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+            session.update({"step":"mines_count","stake":amount}); rows=[[InlineKeyboardButton(text=str(a),callback_data=f"mines:count:{a}") for a in range(2,14)],[InlineKeyboardButton(text=str(a),callback_data=f"mines:count:{a}") for a in range(14,25)]]; await message.answer(f"<tg-emoji emoji-id='5280569974404966639'>💣</tg-emoji> MINES\n\n💎 Ставка: <b>{amount} ₽</b>\n\nВыберите количество бомб:",reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
         else:
             session.update({"step":"dice_confirm","stake":amount}); await message.answer(f"🎲 DICE\n\nСтавка: <b>{amount} ₽</b>\nРежим: {'один бросок' if session['mode']=='one' else 'два броска'}\nВыбор: <b>{session['bet']}</b>\n\nПодтвердить ставку?",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подтвердить ставку",callback_data="diceconfirm:yes"),InlineKeyboardButton(text="Отмена",callback_data="diceconfirm:no")]]))
         return

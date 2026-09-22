@@ -105,3 +105,7 @@ x50 получил дуговое колесо, 16-секундный countdown,
 
 ## Images
 The Mini App serves images directly from the project root. No `assets/` directory is required. Keep `start.jpg` and `upgrader_spin.gif` next to `bot.py`.
+
+
+### Premium custom emoji
+The bot uses Telegram custom emoji entities for the supplied IDs. The Mini App displays the same IDs through the `/custom-emoji/{id}` proxy; no `assets/` folder is required. Inline keyboard button labels keep ordinary Unicode emoji because Telegram does not support message entities inside button text.
