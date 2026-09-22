@@ -45,7 +45,7 @@ x50 получил дуговое колесо, 16-секундный countdown,
 - Added **Upgrader** to the Mini App and Telegram bot.
 - Presets: **x2 / x5 / x10**, **35% / 70%**, and custom **1–80%** chance.
 - The Mini App uses an ice-blue win zone and an animated pointer.
-- The bot supports `/upgrade`, amount input, inline choice buttons, and a local `assets/upgrader_spin.gif` animation.
+- The bot supports `/upgrade`, amount input, inline choice buttons, and a local `upgrader_spin.gif` animation.
 - Every game round receives a SHA-256 **round hash** before the result. After completion the server seed is revealed so the user can verify `SHA256(server_seed) == round_hash`.
 - Round metadata is stored in `games` and returned in history. Existing SQLite databases are migrated automatically.
 - The existing `REAL_ECONOMY` switch remains unchanged; keep it disabled while testing.
@@ -53,7 +53,7 @@ x50 получил дуговое колесо, 16-секундный countdown,
 
 ## Что добавлено в этой версии
 
-- `/start` теперь отправляет исходное изображение Resonant Casino из `assets/start.jpg` и не меняет его при навигации по inline-кнопкам.
+- `/start` теперь отправляет исходное изображение Resonant Casino из `start.jpg` и не меняет его при навигации по inline-кнопкам.
 - Бот-меню: `Профиль`, `Кошелек`, `Бонусы`, `Играть`, `Помощь`.
 - Профиль с ID, балансом, играми, победами, поражениями, winrate, оборотом, выигрышами и MAX WIN.
 - История игр, история пополнений/выводов и реферальный экран.
@@ -68,13 +68,13 @@ x50 получил дуговое колесо, 16-секундный countdown,
 - CRASH получил визуальную ракету и 💥 при достижении серверного crash point.
 - Для CRASH/Mines/Upgrader использован параметр house edge 2% (RTP 98% для этих математических схем).
 - `Hash round` / server seed сохраняются и раскрываются после завершения раунда.
-- Upgrader в боте продолжает использовать GIF из `assets/upgrader_spin.gif`.
+- Upgrader в боте продолжает использовать GIF из `upgrader_spin.gif`.
 
 ### Важно перед запуском
 
 1. Заполните `.env`: `BOT_TOKEN`, `BASE_URL`, `WEBHOOK_SECRET`, `ADMIN_IDS`.
 2. Для Crypto Pay задайте `CRYPTOBOT_TOKEN`.
-3. `START_IMAGE=./assets/start.jpg` уже добавлен.
+3. `START_IMAGE=./start.jpg` уже добавлен.
 4. `HELP_USERNAME=narotan7`.
 5. Для реальной экономики оставляйте `REAL_ECONOMY=false`, пока не проведете тестирование и не проверите юридические/платежные требования.
 6. В текущей реализации пополнение через Crypto Pay создается как invoice. Вывод создает заявку и резервирует средства в БД; фактическая выплата требует обработки администратором. Автоматическая Crypto Pay payout-схема отдельно не включена.
@@ -99,5 +99,9 @@ x50 получил дуговое колесо, 16-секундный countdown,
 - Mini App: главное лобби с баннером Resonant Casino, балансом, `+`, аватаром, боковым меню и нижней навигацией.
 - Mini App Profile содержит статистику, истории игр/пополнений/выводов и ADMIN PANEL для администраторов.
 - ADMIN PANEL в боте и Mini App используют общую SQLite БД и audit logs.
-- `/assets/start.jpg` подключён как стартовый/лобби-баннер.
+- `/start.jpg` подключён как стартовый/лобби-баннер.
 - Проверьте `ADMIN_IDS`, `BOT_TOKEN`, `BASE_URL`, `WEBAPP_URL`, `CRYPTOBOT_TOKEN` перед запуском.
+
+
+## Images
+The Mini App serves images directly from the project root. No `assets/` directory is required. Keep `start.jpg` and `upgrader_spin.gif` next to `bot.py`.

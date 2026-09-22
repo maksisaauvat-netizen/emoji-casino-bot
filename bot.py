@@ -44,14 +44,38 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 app = FastAPI(title="Resonant Casino")
-app.mount("/assets", StaticFiles(directory=str(Path(__file__).with_name("assets"))), name="assets")
+# Images are kept in the project root (not in an assets/ directory).
+ROOT_DIR = Path(__file__).resolve().parent
+
+@app.get("/start.jpg")
+@app.get("/assets/start.jpg")
+async def start_image():
+    candidates = [
+        ROOT_DIR / "start.jpg",
+        ROOT_DIR / "start.jpeg",
+        ROOT_DIR / "IMG_2135.jpeg",
+        ROOT_DIR / "IMG_2135.jpg",
+    ]
+    for path in candidates:
+        if path.exists():
+            return FileResponse(path)
+    raise HTTPException(status_code=404, detail="Start image not found")
+
+@app.get("/upgrader_spin.gif")
+@app.get("/assets/upgrader_spin.gif")
+async def upgrader_gif():
+    candidates = [ROOT_DIR / "upgrader_spin.gif", ROOT_DIR / "upgrader.gif"]
+    for path in candidates:
+        if path.exists():
+            return FileResponse(path, media_type="image/gif")
+    raise HTTPException(status_code=404, detail="Upgrader GIF not found")
 active_games: dict[int, dict] = {}
 
 GAME_NAMES = {"slot", "x50", "crash", "dice", "mines", "upgrader", "slot_buy"}
 RNG = random.SystemRandom()
 UPGRADE_HOUSE_EDGE = float(os.getenv("UPGRADE_HOUSE_EDGE", "0.04"))
-UPGRADE_GIF = Path(os.getenv("UPGRADE_GIF", str(Path(__file__).with_name("assets").joinpath("upgrader_spin.gif"))))
-START_IMAGE = Path(os.getenv("START_IMAGE", str(Path(__file__).with_name("assets").joinpath("start.jpg"))))
+UPGRADE_GIF = Path(os.getenv("UPGRADE_GIF", str(ROOT_DIR / "upgrader_spin.gif")))
+START_IMAGE = Path(os.getenv("START_IMAGE", str(ROOT_DIR / "start.jpg")))
 HELP_USERNAME = os.getenv("HELP_USERNAME", "narotan7").lstrip("@")
 BOT_USERNAME = os.getenv("BOT_USERNAME", "").lstrip("@")
 upgrade_sessions: dict[int, dict] = {}
@@ -794,7 +818,6 @@ async def menu_callbacks(callback: CallbackQuery):
             "╭────────────────────╮\n       🎁 | BONUS\n╰────────────────────╯\n\n"
             "Бонусы и реферальная система доступны в приложении.",
             InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="📱 Открыть приложение", web_app=WebAppInfo(url=WEBAPP_URL))],
                 [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:home")]
             ]))
     elif action=="games":
@@ -845,7 +868,7 @@ async def game_callbacks(callback: CallbackQuery):
     elif g=="upgrader":
         upgrade_sessions[uid]={"step":"amount"}; await callback.message.answer("⚡ UPGRADER\nВведите сумму ставки (10–5000 ₽).")
     elif g in {"crash","x50"}:
-        await callback.message.answer(f"╭────────────────────╮\n       {'🚀 CRASH' if g=='crash' else '🎡 x50'}\n╰────────────────────╯\n\nЭтот режим доступен в приложении.\nВы можете открыть его из главного меню приложения.",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="📱 Играть в приложении",web_app=WebAppInfo(url=f"{WEBAPP_URL}?game={g}"))],[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]]))
+        await callback.message.answer(f"╭────────────────────╮\n       {'🚀 CRASH' if g=='crash' else '🎡 x50'}\n╰────────────────────╯\n\nЭтот режим доступен в приложении.\nДля запуска откройте его через кнопку «🎰 • Играть в приложении» в разделе GAMES.",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]]))
     else:
         await callback.message.answer("Неизвестная игра.",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]]))
     await callback.answer()
