@@ -1,4 +1,5 @@
 import os
+import os
 import sqlite3
 import threading
 import time
@@ -61,6 +62,14 @@ def init_db() -> None:
         CREATE INDEX IF NOT EXISTS idx_games_user ON games(user_id, id DESC);
         CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id, id DESC);
         CREATE INDEX IF NOT EXISTS idx_withdrawals_user ON withdrawals(user_id, id DESC);
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            action TEXT NOT NULL,
+            details TEXT NOT NULL DEFAULT '',
+            created_at INTEGER NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id, id DESC);
         CREATE TABLE IF NOT EXISTS inventory_items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
@@ -152,6 +161,7 @@ def get_user_stats(user_id: int) -> dict:
             "winrate": round((wins / games * 100) if games else 0, 1),
             "turnover": int(row[2] or 0),
             "payouts": int(row[3] or 0),
+            "max_win": int((c.execute("SELECT COALESCE(MAX(payout),0) FROM games WHERE user_id=?",(int(user_id),)).fetchone()[0] or 0)),
         }
 
 
@@ -305,3 +315,18 @@ def sell_inventory_item(user_id: int, item_id: int):
         c.execute("UPDATE users SET balance_rub=balance_rub+?, updated_at=? WHERE user_id=?", (int(row["value_rub"]), now, int(user_id)))
         balance = int(c.execute("SELECT balance_rub FROM users WHERE user_id=?", (int(user_id),)).fetchone()[0])
         return {"id": int(row["id"]), "value_rub": int(row["value_rub"]), "balance": balance}
+
+
+def log_event(user_id: int | None, action: str, details: str = "") -> None:
+    with _LOCK, _conn() as c:
+        c.execute("INSERT INTO audit_logs(user_id,action,details,created_at) VALUES (?,?,?,?)",
+                  (None if user_id is None else int(user_id), str(action), str(details), int(time.time())))
+
+def get_audit_logs(limit: int = 50):
+    return _rows("SELECT * FROM audit_logs ORDER BY id DESC LIMIT ?", (int(limit),))
+
+def get_all_users(limit: int = 100):
+    return _rows("SELECT user_id,balance_rub,created_at,updated_at FROM users ORDER BY updated_at DESC LIMIT ?", (int(limit),))
+
+def get_all_payments(limit: int = 50):
+    return _rows("SELECT * FROM payments ORDER BY id DESC LIMIT ?", (int(limit),))

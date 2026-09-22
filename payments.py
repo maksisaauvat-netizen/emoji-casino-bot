@@ -3,7 +3,7 @@ from typing import Optional
 
 import aiohttp
 
-from database import create_payment, mark_payment_paid
+from database import create_payment, mark_payment_paid, log_event
 
 CRYPTOBOT_TOKEN = os.getenv("CRYPTOBOT_TOKEN", "").strip()
 CRYPTOBOT_API = os.getenv("CRYPTOBOT_API", "https://pay.crypt.bot/api")
@@ -40,6 +40,7 @@ async def create_invoice(user_id: int, amount_usdt: float) -> dict:
         "pay_url": result.get("pay_url") or result.get("bot_invoice_url") or result.get("mini_app_invoice_url"),
     }
     create_payment(user_id, invoice["invoice_id"], amount_usdt, int(round(amount_usdt * USDT_TO_RUB)), invoice["status"])
+    log_event(user_id, "deposit_invoice_created", f"invoice={invoice['invoice_id']} amount_usdt={amount_usdt}")
     return invoice
 
 
@@ -57,4 +58,6 @@ async def process_paid_invoice(invoice_id: int):
         return None
     if invoice.get("status") != "paid":
         return None
-    return mark_payment_paid(int(invoice_id))
+    result = mark_payment_paid(int(invoice_id))
+    if result: log_event(int(result['user_id']), "deposit_paid", f"invoice={invoice_id} amount_rub={result['amount_rub']}")
+    return result

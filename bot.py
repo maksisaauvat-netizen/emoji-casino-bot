@@ -23,6 +23,8 @@ from database import (
     init_db, ensure_user, get_balance, change_balance, subtract_balance,
     get_user_stats, get_game_history, get_payment_history,
     get_withdrawal_history, create_withdrawal, record_game,
+    get_audit_logs, get_all_users, get_all_payments, log_event,
+    approve_withdrawal, reject_withdrawal,
 )
 from payments import create_invoice, process_paid_invoice, get_invoice
 
@@ -47,7 +49,11 @@ GAME_NAMES = {"slot", "x50", "crash", "blackjack", "mines", "upgrader", "slot_bu
 RNG = random.SystemRandom()
 UPGRADE_HOUSE_EDGE = float(os.getenv("UPGRADE_HOUSE_EDGE", "0.04"))
 UPGRADE_GIF = Path(os.getenv("UPGRADE_GIF", str(Path(__file__).with_name("assets").joinpath("upgrader_spin.gif"))))
+START_IMAGE = Path(os.getenv("START_IMAGE", str(Path(__file__).with_name("assets").joinpath("start.jpg"))))
+HELP_USERNAME = os.getenv("HELP_USERNAME", "narotan7").lstrip("@")
+BOT_USERNAME = os.getenv("BOT_USERNAME", "").lstrip("@")
 upgrade_sessions: dict[int, dict] = {}
+bot_sessions: dict[int, dict] = {}
 
 
 
@@ -154,6 +160,7 @@ def finish(uid: int, game: str, stake: int, won: bool, multiplier: float,
     ss = round_state.get("server_seed", "") if round_state else ""
     record_game(uid, game, stake, "win" if won else "loss",
                 float(multiplier if won else 0), payout, rh, ss)
+    log_event(uid, f"game_{game}", f"stake={stake} result={'win' if won else 'loss'} payout={payout}")
     active_games.pop(uid, None)
     result = {
         "status": "finished", "game": game, "stake": stake,
@@ -270,9 +277,10 @@ def slot_spin(round_state=None, spin_no=0):
 # result among x2/x3/x5/x50. Client animation never decides result.
 # ============================================================
 
-X50 = ["x2", "x3", "x5", "x50"]
+X50 = ["x2", "x3", "x5", "x50", "bonus"]
 X50_MULT = {"x2": 2, "x3": 3, "x5": 5, "x50": 50}
-X50_WEIGHTS = [54, 30, 12, 1]  # configurable; target Mini App can be tuned
+# Wheel outcome distribution. "bonus" opens Diamond. The RNG is server-side.
+X50_WEIGHTS = [54, 30, 12, 1, 3]
 
 
 # ============================================================
@@ -281,7 +289,7 @@ X50_WEIGHTS = [54, 30, 12, 1]  # configurable; target Mini App can be tuned
 
 def crash_point(round_state=None):
     u = pf_unit(round_state, "crash") if round_state else RNG.random()
-    return round(max(1.0, min(1000.0, 0.97 / max(1e-12, 1-u))), 2)
+    return round(max(1.0, min(1000.0, 0.98 / max(1e-12, 1-u))), 2)
 
 
 def crash_current(state):
@@ -302,7 +310,7 @@ def mines_multiplier(mine_count, opened):
     p = 1.0
     for i in range(opened):
         p *= (safe-i)/(25-i)
-    return round(0.97/p, 4)
+    return round(0.98/p, 4)
 
 
 # ============================================================
@@ -372,6 +380,26 @@ async def history(p: Auth):
             "withdrawals":get_withdrawal_history(uid,20),"stats":get_user_stats(uid)}
 
 
+
+@app.post("/api/admin/overview")
+async def admin_overview(p: Auth):
+    u=validate_telegram_webapp_data(p.init_data); uid=int(u["id"])
+    if not is_admin(uid): raise HTTPException(403,"Admin only")
+    return {"users":get_all_users(100),"payments":get_all_payments(100),
+            "withdrawals":__import__('database').get_pending_withdrawals(100),
+            "logs":get_audit_logs(100)}
+
+@app.post("/api/admin/adjust")
+async def admin_adjust(payload: dict):
+    u=validate_telegram_webapp_data(str(payload.get("init_data",""))); uid=int(u["id"])
+    if not is_admin(uid): raise HTTPException(403,"Admin only")
+    target=int(payload.get("user_id",0)); amount=int(payload.get("amount_rub",0))
+    if not target or amount==0: raise HTTPException(400,"user_id and non-zero amount required")
+    ensure_user(target); new_balance=change_balance(target,amount)
+    log_event(uid,"admin_balance_adjust",f"target={target} amount={amount}")
+    log_event(target,"admin_balance_changed",f"amount={amount}")
+    return {"user_id":target,"balance":new_balance}
+
 @app.post("/api/game/start")
 async def start(p: StartGame):
     u=validate_telegram_webapp_data(p.init_data); uid=int(u["id"]); ensure_user(uid)
@@ -439,7 +467,7 @@ async def start(p: StartGame):
     if game=="x50":
         opt=(p.option or "").lower()
         if opt not in X50:
-            change_balance(uid,stake); raise HTTPException(400,"Выберите x2, x3, x5 или x50")
+            change_balance(uid,stake); raise HTTPException(400,"Выберите x2, x3, x5, x50 или Diamond")
         n=pf_u64(round_state,"x50") % sum(X50_WEIGHTS)
         acc=0; result=X50[-1]
         for name,w in zip(X50,X50_WEIGHTS):
@@ -526,9 +554,27 @@ async def action(p: Action):
         if a!="reveal": raise HTTPException(400,"Раунд ещё не завершён")
         if time.time()-g["started_at"] < g["round_seconds"]:
             raise HTTPException(409,"Раунд ещё идёт")
-        result=g["result"]; won=result==g["selected"]
+        result=g["result"]
+        if result=="bonus":
+            g["diamond_pending"]=True
+            return {"status":"diamond","game":"x50","selected":g["selected"],"result":"bonus",
+                    "cells":[5,5,5,7,7,7,10,10,25],"balance":bal(uid), **round_public(g["round"])}
+        won=result==g["selected"]
         return finish(uid,"x50",g["stake"],won,X50_MULT[result] if won else 0,
                       {"selected":g["selected"],"result":result,"round_seconds":g["round_seconds"]},
+                      round_state=g["round"])
+
+    if g["type"]=="x50" and g.get("diamond_pending"):
+        if not a.startswith("diamond:"): raise HTTPException(400,"Выберите ячейку Diamond")
+        try: idx=int(a.split(":",1)[1])
+        except: raise HTTPException(400,"Некорректная ячейка")
+        cells=[5,5,5,7,7,7,10,10,25]
+        if not 0<=idx<len(cells): raise HTTPException(400,"Некорректная ячейка")
+        mult=cells[idx]
+        # Diamond only pays a bonus bet; a non-bonus selection loses this round.
+        won=g["selected"]=="bonus"
+        return finish(uid,"x50",g["stake"],won,mult if won else 0,
+                      {"selected":g["selected"],"result":"bonus","diamond_multiplier":mult,"diamond_index":idx},
                       round_state=g["round"])
 
     if g["type"]=="crash":
@@ -610,22 +656,205 @@ async def withdraw(p: Withdraw):
     return {"withdrawal":result,"balance":bal(uid)}
 
 
-def start_keyboard():
+def _menu_keyboard(user_id: int):
+    rows = [
+        [InlineKeyboardButton(text="👤 Профиль", callback_data="menu:profile")],
+        [InlineKeyboardButton(text="💰 Кошелек", callback_data="menu:wallet"),
+         InlineKeyboardButton(text="🎁 Бонусы", callback_data="menu:bonuses")],
+        [InlineKeyboardButton(text="🎮 Играть", callback_data="menu:games")],
+        [InlineKeyboardButton(text="🆘 Помощь", url=f"https://t.me/{HELP_USERNAME}")],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+def _profile_keyboard(user_id: int):
+    rows = [
+        [InlineKeyboardButton(text="История игр", callback_data="profile:games"),
+         InlineKeyboardButton(text="Реферальная система", callback_data="profile:ref")],
+    ]
+    if is_admin(user_id):
+        rows.append([InlineKeyboardButton(text="ADMIN PANEL", callback_data="admin:home")])
+    rows.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:home")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+def _wallet_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎮 Открыть Resonant Casino",
-                              web_app=WebAppInfo(url=WEBAPP_URL))]
+        [InlineKeyboardButton(text="Пополнить", callback_data="wallet:deposit"),
+         InlineKeyboardButton(text="Вывод", callback_data="wallet:withdraw")],
+        [InlineKeyboardButton(text="История", callback_data="wallet:history")],
+        [InlineKeyboardButton(text="🎮 Играть", callback_data="menu:games"),
+         InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:home")],
     ])
 
+def _games_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📱 Приложение", web_app=WebAppInfo(url=WEBAPP_URL))],
+        [InlineKeyboardButton(text="🚀 CRASH", callback_data="game:crash"),
+         InlineKeyboardButton(text="🎰 SLOTS", callback_data="game:slot")],
+        [InlineKeyboardButton(text="💣 MINES", callback_data="game:mines"),
+         InlineKeyboardButton(text="🎡 x50", callback_data="game:x50")],
+        [InlineKeyboardButton(text="⚡ Upgrader", callback_data="game:upgrader")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:home")],
+    ])
+
+async def _edit_menu(callback: CallbackQuery, text: str, markup: InlineKeyboardMarkup):
+    try:
+        await callback.message.edit_caption(caption=text, reply_markup=markup)
+    except Exception:
+        try:
+            await callback.message.edit_text(text, reply_markup=markup)
+        except Exception:
+            await callback.message.answer(text, reply_markup=markup)
+
+def _profile_text(uid: int) -> str:
+    s=get_user_stats(uid); b=get_balance(uid)
+    return (
+        "╭────────────────────╮\n"
+        "       👤 | PROFILE\n"
+        "╰────────────────────╯\n\n"
+        f"🆔 ID: <code>{uid}</code>\n\n"
+        f"💰 | BALANCE:\n└ ‘{b:,} ₽’\n\n"
+        f"🎮 | ИГРЫ\n└ ‘{s['games']}’\n\n"
+        f"🏆 | ПОБЕДЫ\n└ ‘{s['wins']}’\n\n"
+        f"❌ | ПОРАЖЕНИЯ\n└ ‘{s['losses']}’\n\n"
+        f"📈 | WINRATE\n└ ‘{s['winrate']}%’\n\n"
+        f"💵 | СТАВКИ\n└ ‘{s['turnover']:,} ₽’\n\n"
+        f"🏆 | ВЫИГРАНО\n└ ‘{s['payouts']:,} ₽’\n\n"
+        f"🔥 | MAX WIN\n└ ‘{s['max_win']:,} ₽’"
+    ).replace(",", " ")
+
+def _wallet_text(uid: int) -> str:
+    b=get_balance(uid); s=get_user_stats(uid)
+    return (
+        "╭────────────────────╮\n"
+        "       💰 | WALLET\n"
+        "╰────────────────────╯\n\n"
+        f"Баланс: <b>{b:,} ₽</b>\n"
+        f"Оборот: <b>{s['turnover']:,} ₽</b>\n\n"
+        "Пополнение и вывод доступны через меню ниже."
+    ).replace(",", " ")
+
+def _games_text() -> str:
+    return (
+        "╭────────────────────╮\n"
+        "       🎮 ИГРЫ\n"
+        "╰────────────────────╯\n\n"
+        "Выберите игру или откройте приложение:"
+    )
 
 @dp.message(CommandStart())
 async def start_handler(message: Message):
-    if message.from_user: ensure_user(message.from_user.id)
-    await message.answer(
-        "🎰 <b>RESONANT CASINO</b>\n\n"
-        "SLOT · x50 · CRASH · Blackjack · Mines\n\n"
-        "Откройте Mini App.\n\n⚡ Апгрейдер: /upgrade",
-        reply_markup=start_keyboard())
+    if not message.from_user: return
+    uid=message.from_user.id
+    ensure_user(uid); log_event(uid, "bot_start")
+    caption=(
+        "╔══════════════════════╗\n"
+        "      🎰 RESONANT\n"
+        "        CASINO\n"
+        "╚══════════════════════╝"
+    )
+    if START_IMAGE.exists():
+        await message.answer_photo(FSInputFile(START_IMAGE), caption=caption, reply_markup=_menu_keyboard(uid))
+    else:
+        await message.answer(caption, reply_markup=_menu_keyboard(uid))
 
+@dp.callback_query(lambda c: c.data and c.data.startswith("menu:"))
+async def menu_callbacks(callback: CallbackQuery):
+    uid=callback.from_user.id; ensure_user(uid)
+    parts=callback.data.split(":")
+    action=parts[1]
+    if action=="adjust":
+        bot_sessions[uid]={"step":"admin_target"}
+        await callback.message.answer("Введите Telegram ID пользователя.")
+        await callback.answer(); return
+    if action=="home":
+        await _edit_menu(callback, "╔══════════════════════╗\n      🎰 RESONANT\n        CASINO\n╚══════════════════════╝", _menu_keyboard(uid))
+    elif action=="profile":
+        await _edit_menu(callback, _profile_text(uid), _profile_keyboard(uid))
+    elif action=="wallet":
+        await _edit_menu(callback, _wallet_text(uid), _wallet_keyboard())
+    elif action=="bonuses":
+        await _edit_menu(callback,
+            "╭────────────────────╮\n       🎁 | BONUS\n╰────────────────────╯\n\n"
+            "Бонусы и реферальная система доступны в приложении.",
+            InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📱 Открыть приложение", web_app=WebAppInfo(url=WEBAPP_URL))],
+                [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:home")]
+            ]))
+    elif action=="games":
+        await _edit_menu(callback, _games_text(), _games_keyboard())
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("profile:"))
+async def profile_callbacks(callback: CallbackQuery):
+    uid=callback.from_user.id; action=callback.data.split(":",1)[1]
+    if action=="games":
+        rows=get_game_history(uid,10)
+        text="╭────────────────────╮\n       🎮 | ИСТОРИЯ ИГР\n╰────────────────────╯\n\n"
+        text += "\n".join(f"#{r['id']} {r['game']} · {r['stake']} ₽ · {r['result']} · {r['payout']} ₽" for r in rows) or "История пуста."
+    else:
+        code=f"ref_{uid}"
+        link=f"https://t.me/{BOT_USERNAME}?start={code}" if BOT_USERNAME else f"Код: {code}"
+        text=f"╭────────────────────╮\n       🤝 | REFERRAL\n╰────────────────────╯\n\nВаша реферальная ссылка:\n<code>{link}</code>"
+    await _edit_menu(callback,text,_profile_keyboard(uid)); await callback.answer()
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("wallet:"))
+async def wallet_callbacks(callback: CallbackQuery):
+    uid=callback.from_user.id; action=callback.data.split(":",1)[1]
+    if action=="history":
+        p=get_payment_history(uid,10); w=get_withdrawal_history(uid,10)
+        text="╭────────────────────╮\n       📜 | ИСТОРИЯ\n╰────────────────────╯\n\n"
+        text+="Пополнения:\n"+("\n".join(f"#{x['id']} {x['amount_rub']} ₽ · {x['status']}" for x in p) or "—")
+        text+="\n\nВыводы:\n"+("\n".join(f"#{x['id']} {x['amount_rub']} ₽ · {x['status']}" for x in w) or "—")
+        await _edit_menu(callback,text,_wallet_keyboard())
+    elif action=="deposit":
+        bot_sessions[uid]={"step":"deposit_amount"}
+        await callback.message.answer("Введите сумму пополнения в USDT. После этого бот создаст Crypto Pay invoice.")
+    elif action=="withdraw":
+        bot_sessions[uid]={"step":"withdraw_amount"}
+        await callback.message.answer("Введите сумму вывода в ₽.")
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("game:"))
+async def game_callbacks(callback: CallbackQuery):
+    uid=callback.from_user.id; g=callback.data.split(":",1)[1]
+    if g=="upgrader":
+        upgrade_sessions[uid]={"step":"amount"}
+        await callback.message.answer("⚡ UPGRADER\nВведите сумму ставки.")
+    else:
+        await callback.message.answer(
+            f"🎮 {g.upper()}\nДля полноценной игры откройте приложение.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📱 Открыть игру", web_app=WebAppInfo(url=f"{WEBAPP_URL}?game={g}"))],
+                [InlineKeyboardButton(text="⬅️ Игры", callback_data="menu:games")]
+            ]))
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("admin:"))
+async def admin_callbacks(callback: CallbackQuery):
+    uid=callback.from_user.id
+    if not is_admin(uid):
+        await callback.answer("Доступ запрещен", show_alert=True); return
+    action=callback.data.split(":",1)[1]
+    if action=="home":
+        text=("╭────────────────────╮\n       🛠 | ADMIN PANEL\n╰────────────────────╯\n\n"
+              "Логи, пользователи, пополнения и заявки на вывод.")
+        markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Логи", callback_data="admin:logs"),
+             InlineKeyboardButton(text="Пользователи", callback_data="admin:users")],
+            [InlineKeyboardButton(text="Пополнения", callback_data="admin:payments"),
+             InlineKeyboardButton(text="Выводы", callback_data="admin:withdrawals")],
+            [InlineKeyboardButton(text="Выдать/снять баланс", callback_data="admin:adjust")],
+            [InlineKeyboardButton(text="⬅️ Профиль", callback_data="menu:profile")]
+        ])
+    elif action=="logs":
+        rows=get_audit_logs(15); text="🛠 ЛОГИ\n\n"+("\n".join(f"#{r['id']} · {r['user_id']} · {r['action']} · {r['details']}" for r in rows) or "—"); markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
+    elif action=="users":
+        rows=get_all_users(20); text="👥 ПОЛЬЗОВАТЕЛИ\n\n"+("\n".join(f"{r['user_id']} · {r['balance_rub']} ₽" for r in rows) or "—"); markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
+    elif action=="payments":
+        rows=get_all_payments(20); text="💳 ПОПОЛНЕНИЯ\n\n"+("\n".join(f"#{r['id']} · {r['user_id']} · {r['amount_rub']} ₽ · {r['status']}" for r in rows) or "—"); markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
+    else:
+        rows=__import__('database').get_pending_withdrawals(20); text="💸 ВЫВОДЫ\n\n"+("\n".join(f"#{r['id']} · {r['user_id']} · {r['amount_rub']} ₽ · {r['status']}" for r in rows) or "—"); markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
+    await _edit_menu(callback,text,markup); await callback.answer()
 
 # ============================================================
 # Telegram bot: Upgrader
@@ -648,24 +877,72 @@ async def upgrade_command(message: Message):
 
 @dp.message()
 async def upgrade_message_router(message: Message):
-    if not message.from_user or message.from_user.id not in upgrade_sessions: return
-    uid=message.from_user.id; s=upgrade_sessions[uid]
+    if not message.from_user: return
+    uid=message.from_user.id
+    session=bot_sessions.get(uid)
+    if session:
+        text=str(message.text or '').strip()
+        if session.get("step")=="deposit_amount":
+            try: amount=float(text.replace(',','.').replace(' ',''))
+            except ValueError: amount=0
+            if amount<=0: await message.answer("Введите положительную сумму в USDT."); return
+            try:
+                inv=await create_invoice(uid, amount)
+                if inv.get("pay_url"):
+                    await message.answer(f"💳 Счет Crypto Pay на {amount:g} USDT:", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Оплатить через CryptoBot", url=inv["pay_url"])]]))
+                else:
+                    await message.answer("Crypto Pay не настроен: добавьте CRYPTOBOT_TOKEN.")
+            except Exception as e:
+                await message.answer(f"Ошибка создания счета: {e}")
+            bot_sessions.pop(uid,None); return
+        if session.get("step")=="withdraw_amount":
+            try: amount=int(float(text.replace(',','.').replace(' ','').replace('₽','')))
+            except ValueError: amount=0
+            if amount<=0: await message.answer("Введите сумму в ₽."); return
+            bot_sessions[uid]={"step":"withdraw_details","amount":amount}
+            await message.answer("Отправьте реквизиты/данные выплаты. Заявка будет видна в ADMIN PANEL.")
+            return
+        if session.get("step")=="withdraw_details":
+            amount=int(session["amount"]); result=create_withdrawal(uid,amount,text)
+            if result is None: await message.answer("Не удалось создать заявку: проверьте баланс и сумму."); bot_sessions.pop(uid,None); return
+            log_event(uid,"withdrawal_created",f"id={result['id']} amount={amount}")
+            await message.answer(f"Заявка на вывод #{result['id']} создана на {amount} ₽.")
+            bot_sessions.pop(uid,None); return
+
+    if session and session.get("step")=="admin_target":
+        if not is_admin(uid): bot_sessions.pop(uid,None); return
+        try: target=int(text)
+        except ValueError: await message.answer("ID должен быть числом."); return
+        bot_sessions[uid]={"step":"admin_amount","target":target}
+        await message.answer("Введите изменение баланса в ₽. Например: <b>+500</b> или <b>-500</b>.")
+        return
+    if session and session.get("step")=="admin_amount":
+        if not is_admin(uid): bot_sessions.pop(uid,None); return
+        try: amount=int(text.replace("₽","").replace(" ",""))
+        except ValueError: await message.answer("Введите целое число со знаком."); return
+        target=int(session["target"]); ensure_user(target); new_balance=change_balance(target,amount)
+        log_event(uid,"admin_balance_adjust",f"target={target} amount={amount}")
+        log_event(target,"admin_balance_changed",f"amount={amount}")
+        bot_sessions.pop(uid,None)
+        await message.answer(f"Баланс пользователя <code>{target}</code> изменен на {amount:+d} ₽. Новый баланс: <b>{new_balance} ₽</b>.")
+        return
+
+    if uid not in upgrade_sessions:
+        return
+    s=upgrade_sessions[uid]
     text=str(message.text or '').strip()
     if s.get("step")=="amount":
         try:
             amount=float(text.replace(',','.').replace(' ',''))
             if amount<=0 or amount>1_000_000: raise ValueError
         except ValueError:
-            await message.answer("Укажите сумму числом, например <b>100</b>.")
-            return
+            await message.answer("Укажите сумму числом, например <b>100</b>."); return
         s["stake"]=int(round(amount)); s["step"]="option"
-        await message.answer("Выберите коэффициент или шанс выигрыша:", reply_markup=upgrader_keyboard())
-        return
+        await message.answer("Выберите коэффициент или шанс выигрыша:", reply_markup=upgrader_keyboard()); return
     if s.get("step")=="custom":
         try: pct=float(text.replace(',','.').replace(' ',''))
         except ValueError: pct=0
-        if not 1<=pct<=80:
-            await message.answer("Процент должен быть от 1 до 80."); return
+        if not 1<=pct<=80: await message.answer("Процент должен быть от 1 до 80."); return
         s["pct"]=pct; s["mult"]=(1-UPGRADE_HOUSE_EDGE)/(pct/100)
         await run_upgrade_bot(message, uid)
 
@@ -694,6 +971,7 @@ async def run_upgrade_bot(message: Message, uid: int):
     payout=int(round(stake*mult)) if won else 0
     if payout: change_balance(uid,payout)
     record_game(uid,"upgrader",stake,"win" if won else "loss",mult if won else 0,payout,rs["round_hash"],rs["server_seed"])
+    log_event(uid, "game_upgrader", f"stake={stake} result={'win' if won else 'loss'} payout={payout}")
     await message.answer(
         f"⚡ <b>UPGRADER</b>\nСтавка: <b>{stake} ₽</b>\nШанс: <b>{pct:.2f}%</b>\nКоэффициент: <b>x{mult:.2f}</b>\nХэш раунда: <code>{rs['round_hash']}</code>"
     )
