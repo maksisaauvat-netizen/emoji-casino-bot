@@ -10,6 +10,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from aiogram import Bot, Dispatcher
@@ -43,9 +44,10 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 app = FastAPI(title="Resonant Casino")
+app.mount("/assets", StaticFiles(directory=str(Path(__file__).with_name("assets"))), name="assets")
 active_games: dict[int, dict] = {}
 
-GAME_NAMES = {"slot", "x50", "crash", "blackjack", "mines", "upgrader", "slot_buy"}
+GAME_NAMES = {"slot", "x50", "crash", "dice", "mines", "upgrader", "slot_buy"}
 RNG = random.SystemRandom()
 UPGRADE_HOUSE_EDGE = float(os.getenv("UPGRADE_HOUSE_EDGE", "0.04"))
 UPGRADE_GIF = Path(os.getenv("UPGRADE_GIF", str(Path(__file__).with_name("assets").joinpath("upgrader_spin.gif"))))
@@ -54,6 +56,7 @@ HELP_USERNAME = os.getenv("HELP_USERNAME", "narotan7").lstrip("@")
 BOT_USERNAME = os.getenv("BOT_USERNAME", "").lstrip("@")
 upgrade_sessions: dict[int, dict] = {}
 bot_sessions: dict[int, dict] = {}
+bot_active_games: dict[int, dict] = {}
 
 
 
@@ -360,7 +363,7 @@ async def config():
         {"id":"slot","name":"SLOT","icon":"🎰"},
         {"id":"x50","name":"x50","icon":"🎡"},
         {"id":"crash","name":"CRASH","icon":"🚀"},
-        {"id":"blackjack","name":"Blackjack","icon":"🃏"},
+        {"id":"dice","name":"DICE","icon":"🎲"},
         {"id":"mines","name":"Mines","icon":"💣"},
         {"id":"upgrader","name":"Upgrader","icon":"⚡"},
     ], "real_economy": REAL_ECONOMY,
@@ -483,6 +486,24 @@ async def start(p: StartGame):
                            "started_at":time.time(),"round":round_state}
         return {"status":"playing","game":"crash","stake":stake,
                 "started_at":active_games[uid]["started_at"],"speed":0.55,"balance":bal(uid), **round_public(round_state)}
+
+    if game=="dice":
+        mode=(p.option or "one").lower()
+        if mode not in {"one","two"}:
+            change_balance(uid,stake); raise HTTPException(400,"Режим DICE: one или two")
+        bet=(p.mines_count and str(p.mines_count)) or ""
+        # option format: one:lt3 / one:gt3 / two:eq7 / two:lt7 / two:gt7
+        parts=mode.split(":")
+        if len(parts)==2:
+            mode,bet=parts
+        else:
+            change_balance(uid,stake); raise HTTPException(400,"Выберите условие DICE")
+        d1=1+pf_index(round_state,"dice1",6)
+        d2=1+pf_index(round_state,"dice2",6)
+        total=d1 if mode=="one" else d1+d2
+        won=(total<3 if bet=="lt3" else total>3 if bet=="gt3" else total==7 if bet=="eq7" else total<7 if bet=="lt7" else total>7 if bet=="gt7" else False)
+        mult=5.0 if bet=="eq7" else 1.85
+        return finish(uid,"dice",stake,won,mult if won else 0,{"mode":mode,"bet":bet,"dice":[d1,d2],"total":total},round_state=round_state)
 
     if game=="blackjack":
         d=deck(round_state); player=[d.pop(),d.pop()]; dealer=[d.pop(),d.pop()]
@@ -687,11 +708,11 @@ def _wallet_keyboard():
 
 def _games_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📱 Приложение", web_app=WebAppInfo(url=WEBAPP_URL))],
-        [InlineKeyboardButton(text="🚀 CRASH", callback_data="game:crash"),
-         InlineKeyboardButton(text="🎰 SLOTS", callback_data="game:slot")],
-        [InlineKeyboardButton(text="💣 MINES", callback_data="game:mines"),
-         InlineKeyboardButton(text="🎡 x50", callback_data="game:x50")],
+        [InlineKeyboardButton(text="🎰 • Играть в приложении", web_app=WebAppInfo(url=WEBAPP_URL))],
+        [InlineKeyboardButton(text="🎰 SLOTS", callback_data="game:slot")],
+        [InlineKeyboardButton(text="💣 MINES", callback_data="game:mines")],
+        [InlineKeyboardButton(text="🎲 DICE", callback_data="game:dice")],
+        [InlineKeyboardButton(text="🚀 CRASH", callback_data="game:crash"), InlineKeyboardButton(text="🎡 x50", callback_data="game:x50")],
         [InlineKeyboardButton(text="⚡ Upgrader", callback_data="game:upgrader")],
         [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:home")],
     ])
@@ -734,12 +755,8 @@ def _wallet_text(uid: int) -> str:
     ).replace(",", " ")
 
 def _games_text() -> str:
-    return (
-        "╭────────────────────╮\n"
-        "       🎮 ИГРЫ\n"
-        "╰────────────────────╯\n\n"
-        "Выберите игру или откройте приложение:"
-    )
+    return ("╭────────────────────╮\n       🎰 GAMES\n╰────────────────────╯\n\n"
+            "🎰 • Играть в приложении\n\nВыберите режим игры:")
 
 @dp.message(CommandStart())
 async def start_handler(message: Message):
@@ -816,18 +833,114 @@ async def wallet_callbacks(callback: CallbackQuery):
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("game:"))
 async def game_callbacks(callback: CallbackQuery):
-    uid=callback.from_user.id; g=callback.data.split(":",1)[1]
-    if g=="upgrader":
-        upgrade_sessions[uid]={"step":"amount"}
-        await callback.message.answer("⚡ UPGRADER\nВведите сумму ставки.")
+    uid=callback.from_user.id; g=callback.data.split(":",1)[1]; ensure_user(uid)
+    if g=="slot":
+        bot_sessions[uid]={"step":"slot_amount"}
+        await callback.message.answer("╭────────────────────╮\n       🎰 SLOTS\n╰────────────────────╯\n\n💎 Ставка:\n\nМинимальная ставка: <b>10 ₽</b>\nМаксимальная ставка: <b>5000 ₽</b>\n\nОтправьте сумму одним сообщением.")
+    elif g=="mines":
+        bot_sessions[uid]={"step":"mines_amount"}
+        await callback.message.answer("╭────────────────────╮\n       💣 MINES\n╰────────────────────╯\n\n💎 ВВЕДИТЕ СТАВКУ\n\nМинимальная ставка: <b>10 ₽</b>\nМаксимальная ставка: <b>5000 ₽</b>\n\nОтправьте сумму одним сообщением.\n\nНапример: <b>10</b>")
+    elif g=="dice":
+        await callback.message.answer("╭────────────────────╮\n       🎲 DICE\n╰────────────────────╯\n\nВыберите режим:",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Один бросок",callback_data="dice:one")],[InlineKeyboardButton(text="Два броска",callback_data="dice:two")],[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]]))
+    elif g=="upgrader":
+        upgrade_sessions[uid]={"step":"amount"}; await callback.message.answer("⚡ UPGRADER\nВведите сумму ставки (10–5000 ₽).")
+    elif g in {"crash","x50"}:
+        await callback.message.answer(f"╭────────────────────╮\n       {'🚀 CRASH' if g=='crash' else '🎡 x50'}\n╰────────────────────╯\n\nЭтот режим доступен в приложении.\nВы можете открыть его из главного меню приложения.",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="📱 Играть в приложении",web_app=WebAppInfo(url=f"{WEBAPP_URL}?game={g}"))],[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]]))
     else:
-        await callback.message.answer(
-            f"🎮 {g.upper()}\nДля полноценной игры откройте приложение.",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="📱 Открыть игру", web_app=WebAppInfo(url=f"{WEBAPP_URL}?game={g}"))],
-                [InlineKeyboardButton(text="⬅️ Игры", callback_data="menu:games")]
-            ]))
+        await callback.message.answer("Неизвестная игра.",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]]))
     await callback.answer()
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("dice:"))
+async def dice_callbacks(callback: CallbackQuery):
+    uid=callback.from_user.id; mode=callback.data.split(":",1)[1]
+    if mode not in {"one","two"}: await callback.answer("Неизвестный режим",show_alert=True); return
+    bot_sessions[uid]={"step":"dice_bet_type","mode":mode}
+    rows=([[InlineKeyboardButton(text="x1.85 | Меньше 3",callback_data="dicebet:one:lt3")],[InlineKeyboardButton(text="x1.85 | Больше 3",callback_data="dicebet:one:gt3")]] if mode=="one" else [[InlineKeyboardButton(text="x5.00 | Равно 7",callback_data="dicebet:two:eq7")],[InlineKeyboardButton(text="x1.85 | Меньше 7",callback_data="dicebet:two:lt7")],[InlineKeyboardButton(text="x1.85 | Больше 7",callback_data="dicebet:two:gt7")]])
+    rows.append([InlineKeyboardButton(text="⬅️ DICE",callback_data="game:dice")]); await callback.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=rows)); await callback.answer()
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("dicebet:"))
+async def dice_bet_callbacks(callback: CallbackQuery):
+    uid=callback.from_user.id; _,mode,bet=callback.data.split(":",2); bot_sessions[uid]={"step":"dice_amount","mode":mode,"bet":bet}
+    await callback.message.answer("🎲 Введите сумму ставки от <b>10</b> до <b>5000 ₽</b>."); await callback.answer()
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("slotconfirm:"))
+async def slot_confirm(callback: CallbackQuery):
+    uid=callback.from_user.id; s=bot_sessions.get(uid,{})
+    if s.get("step")!="slot_confirm": await callback.answer("Сессия не найдена",show_alert=True); return
+    if callback.data.endswith(":cancel"): bot_sessions.pop(uid,None); await callback.message.answer("Ставка отменена."); await callback.answer(); return
+    stake=int(s["stake"])
+    if not subtract_balance(uid,stake): bot_sessions.pop(uid,None); await callback.message.answer("Недостаточно средств на балансе."); await callback.answer(); return
+    rs=new_round("slots_bot",uid); roll=pf_unit(rs,"slot")
+    if roll<0.003: combo="7️⃣7️⃣7️⃣"; mult=50.0
+    elif roll<0.013: combo="🍋🍋🍋"; mult=10.0
+    elif roll<0.093: sym=RNG.choice(["🍒","🔔","💎","🍀"]); combo=sym*3; mult=3.5
+    elif roll<0.343: sym=RNG.choice(["🍒","🔔","💎","🍀"]); combo=sym+sym+RNG.choice(["🍋","7️⃣","⭐"]); mult=1.85
+    else: combo=RNG.choice(["🍋⭐🍒","🔔🍋💎","🍒7️⃣🔔","⭐🍀🍋"]); mult=0.0
+    payout=int(round(stake*mult)) if mult else 0
+    if payout: change_balance(uid,payout)
+    record_game(uid,"slots_bot",stake,"win" if payout else "loss",mult,payout,rs["round_hash"],rs["server_seed"]); log_event(uid,"game_slots_bot",f"stake={stake} combo={combo} payout={payout}"); bot_sessions.pop(uid,None)
+    result=f"🎉 Выигрыш: <b>{payout} ₽</b>" if payout else "❌ Проигрыш"
+    await callback.message.answer(f"╭────────────────────╮\n       🎰 SLOTS\n╰────────────────────╯\n\n💎 Ставка: <b>{stake} ₽</b>\n\n<code>{combo}</code>\n\n{result}\n\nХэш раунда: <code>{rs['round_hash']}</code>\nServer seed: <code>{rs['server_seed']}</code>\n\n🍋🍋🍋 — ×10\n7️⃣7️⃣7️⃣ — ×50\n3 одинаковых — ×3.5\n2 одинаковых — ×1.85\nДругие комбинации — проигрыш.",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎰 Ещё раз",callback_data="game:slot")],[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]])); await callback.answer()
+
+def mines_bot_keyboard(opened):
+    rows=[]
+    for r in range(5): rows.append([InlineKeyboardButton(text="💎" if i in opened else "·",callback_data=f"bmines:cell:{i}") for i in range(r*5,r*5+5)])
+    rows.append([InlineKeyboardButton(text="💰 Забрать",callback_data="bmines:cashout")]); return InlineKeyboardMarkup(inline_keyboard=rows)
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("mines:"))
+async def mines_callbacks(callback: CallbackQuery):
+    uid=callback.from_user.id; parts=callback.data.split(":")
+    if parts[1]=="count":
+        s=bot_sessions.get(uid,{})
+        if s.get("step")!="mines_count": await callback.answer("Сессия не найдена",show_alert=True); return
+        s.update({"step":"mines_confirm","mines_count":int(parts[2])})
+        await callback.message.answer(f"💣 MINES\n\nСтавка: <b>{s['stake']} ₽</b>\nБомб: <b>{s['mines_count']}</b>\n\nПодтвердить ставку?",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подтвердить ставку",callback_data="minesconfirm:yes"),InlineKeyboardButton(text="Отмена",callback_data="minesconfirm:no")]]))
+    await callback.answer()
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("minesconfirm:"))
+async def mines_confirm(callback: CallbackQuery):
+    uid=callback.from_user.id; s=bot_sessions.get(uid,{})
+    if s.get("step")!="mines_confirm": await callback.answer("Сессия не найдена",show_alert=True); return
+    if callback.data.endswith(":no"): bot_sessions.pop(uid,None); await callback.message.answer("Ставка отменена."); await callback.answer(); return
+    stake=int(s["stake"]); mc=int(s["mines_count"])
+    if not subtract_balance(uid,stake): bot_sessions.pop(uid,None); await callback.message.answer("Недостаточно средств на балансе."); await callback.answer(); return
+    rs=new_round("mines_bot",uid); pool=list(range(25))
+    for i in range(24,0,-1): j=pf_index(rs,"mines",25,i)%(i+1); pool[i],pool[j]=pool[j],pool[i]
+    bot_active_games[uid]={"type":"mines","stake":stake,"mines":pool[:mc],"opened":[],"multiplier":1.0,"round":rs}; bot_sessions.pop(uid,None)
+    await callback.message.answer("╭────────────────────╮\n       💣 MINES\n╰────────────────────╯\n\nОткройте клетку:",reply_markup=mines_bot_keyboard([])); await callback.answer()
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("bmines:"))
+async def bot_mines_play(callback: CallbackQuery):
+    uid=callback.from_user.id; g=bot_active_games.get(uid)
+    if not g: await callback.answer("Нет активной игры",show_alert=True); return
+    action=callback.data.split(":",1)[1]
+    if action=="cashout":
+        if not g["opened"]: await callback.answer("Сначала откройте клетку",show_alert=True); return
+        payout=int(round(g["stake"]*g["multiplier"])); change_balance(uid,payout); rs=g["round"]
+        record_game(uid,"mines_bot",g["stake"],"win",g["multiplier"],payout,rs["round_hash"],rs["server_seed"]); log_event(uid,"game_mines_bot",f"stake={g['stake']} payout={payout}"); bot_active_games.pop(uid,None)
+        await callback.message.answer(f"🎉 Вы забрали <b>{payout} ₽</b> · x{g['multiplier']:.2f}\nХэш раунда: <code>{rs['round_hash']}</code>\nServer seed: <code>{rs['server_seed']}</code>",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="💣 Ещё раз",callback_data="game:mines")]])); await callback.answer(); return
+    idx=int(action.split(":",1)[1])
+    if idx in g["opened"]: await callback.answer("Клетка уже открыта",show_alert=True); return
+    rs=g["round"]
+    if idx in g["mines"]:
+        record_game(uid,"mines_bot",g["stake"],"loss",0,0,rs["round_hash"],rs["server_seed"]); log_event(uid,"game_mines_bot",f"stake={g['stake']} mine={idx}"); bot_active_games.pop(uid,None)
+        await callback.message.answer(f"💥 Мина! Вы проиграли <b>{g['stake']} ₽</b>.\nХэш раунда: <code>{rs['round_hash']}</code>\nServer seed: <code>{rs['server_seed']}</code>",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="💣 Ещё раз",callback_data="game:mines")]])); await callback.answer(); return
+    g["opened"].append(idx); g["multiplier"]=mines_multiplier(len(g["mines"]),len(g["opened"]))
+    await callback.message.edit_reply_markup(reply_markup=mines_bot_keyboard(g["opened"])); await callback.answer(f"Безопасно · x{g['multiplier']:.2f}")
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("diceconfirm:"))
+async def dice_confirm(callback: CallbackQuery):
+    uid=callback.from_user.id; s=bot_sessions.get(uid,{})
+    if s.get("step")!="dice_confirm": await callback.answer("Сессия не найдена",show_alert=True); return
+    if callback.data.endswith(":no"): bot_sessions.pop(uid,None); await callback.message.answer("Ставка отменена."); await callback.answer(); return
+    stake=int(s["stake"])
+    if not subtract_balance(uid,stake): bot_sessions.pop(uid,None); await callback.message.answer("Недостаточно средств на балансе."); await callback.answer(); return
+    rs=new_round("dice_bot",uid); mode=s["mode"]; bet=s["bet"]; d1=1+pf_index(rs,"dice1",6); d2=1+pf_index(rs,"dice2",6); total=d1 if mode=="one" else d1+d2
+    won=(total<3 if bet=="lt3" else total>3 if bet=="gt3" else total==7 if bet=="eq7" else total<7 if bet=="lt7" else total>7); mult=5.0 if bet=="eq7" else 1.85; payout=int(round(stake*mult)) if won else 0
+    if payout: change_balance(uid,payout)
+    record_game(uid,"dice_bot",stake,"win" if won else "loss",mult if won else 0,payout,rs["round_hash"],rs["server_seed"]); log_event(uid,"game_dice_bot",f"stake={stake} dice={d1},{d2} bet={bet} payout={payout}"); bot_sessions.pop(uid,None)
+    rolls=f"🎲 {d1}" if mode=="one" else f"🎲 {d1} + {d2} = <b>{total}</b>"; result=f"🎉 Выигрыш: <b>{payout} ₽</b>" if payout else "❌ Проигрыш"
+    await callback.message.answer(f"╭────────────────────╮\n       🎲 DICE\n╰────────────────────╯\n\n{rolls}\n\n{result}\n\nХэш раунда: <code>{rs['round_hash']}</code>\nServer seed: <code>{rs['server_seed']}</code>",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎲 Ещё раз",callback_data="game:dice")],[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]])); await callback.answer()
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("admin:"))
 async def admin_callbacks(callback: CallbackQuery):
@@ -908,6 +1021,18 @@ async def upgrade_message_router(message: Message):
             log_event(uid,"withdrawal_created",f"id={result['id']} amount={amount}")
             await message.answer(f"Заявка на вывод #{result['id']} создана на {amount} ₽.")
             bot_sessions.pop(uid,None); return
+
+    if session and session.get("step") in {"slot_amount","mines_amount","dice_amount"}:
+        try: amount=int(float(text.replace(',','.').replace(' ','').replace('₽','')))
+        except ValueError: amount=0
+        if not 10<=amount<=5000: await message.answer("Сумма ставки должна быть от <b>10 ₽</b> до <b>5000 ₽</b>."); return
+        if session["step"]=="slot_amount":
+            session.update({"step":"slot_confirm","stake":amount}); await message.answer(f"🎰 SLOTS\n\n💎 Ставка: <b>{amount} ₽</b>\n\nПодтвердить ставку?",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подтвердить ставку",callback_data="slotconfirm:yes"),InlineKeyboardButton(text="Отмена",callback_data="slotconfirm:cancel")]]))
+        elif session["step"]=="mines_amount":
+            session.update({"step":"mines_count","stake":amount}); rows=[[InlineKeyboardButton(text=str(a),callback_data=f"mines:count:{a}") for a in range(2,14)],[InlineKeyboardButton(text=str(a),callback_data=f"mines:count:{a}") for a in range(14,25)]]; await message.answer(f"💣 MINES\n\n💎 Ставка: <b>{amount} ₽</b>\n\nВыберите количество бомб:",reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+        else:
+            session.update({"step":"dice_confirm","stake":amount}); await message.answer(f"🎲 DICE\n\nСтавка: <b>{amount} ₽</b>\nРежим: {'один бросок' if session['mode']=='one' else 'два броска'}\nВыбор: <b>{session['bet']}</b>\n\nПодтвердить ставку?",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подтвердить ставку",callback_data="diceconfirm:yes"),InlineKeyboardButton(text="Отмена",callback_data="diceconfirm:no")]]))
+        return
 
     if session and session.get("step")=="admin_target":
         if not is_admin(uid): bot_sessions.pop(uid,None); return
