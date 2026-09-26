@@ -24,7 +24,7 @@ from database import (
     init_db, ensure_user, sync_profile, get_balance, change_balance, subtract_balance,
     get_user_stats, get_game_history, get_payment_history,
     get_withdrawal_history, create_withdrawal, record_game,
-    get_audit_logs, get_all_users, get_all_payments, get_user_profile, get_user_ledger, get_ledger_activity, log_event,
+    get_audit_logs, get_all_users, get_all_payments, get_user_profile, get_user_profile_by_app_id, get_user_ledger, get_ledger_activity, log_event,
     approve_withdrawal, reject_withdrawal,
 )
 from payments import create_invoice, process_paid_invoice, get_invoice
@@ -803,7 +803,7 @@ def _profile_text(uid: int) -> str:
         f"👤 Username: <b>@{username}</b>\n"
         f"🆔 Telegram ID: <code>{uid}</code>\n"
         f"🗃 App User ID: <code>{app_id}</code>\n\n"
-        f"💰 BALANCE: <b>{b:,} ₽</b>\n\n"
+        f"💰 BALANCE: <b>{b:,.2f} ₽</b>\n\n"
         f"🎮 ИГРЫ: <b>{s['games']}</b>\n"
         f"🏆 ПОБЕДЫ: <b>{s['wins']}</b>\n"
         f"❌ ПОРАЖЕНИЯ: <b>{s['losses']}</b>\n"
@@ -819,7 +819,7 @@ def _wallet_text(uid: int) -> str:
         "╭────────────────────╮\n"
         "       <tg-emoji emoji-id='5278467510604160626'>💰</tg-emoji> | WALLET\n"
         "╰────────────────────╯\n\n"
-        f"Баланс: <b>{b:,} {M}</b>\n"
+        f"Баланс: <b>{b:,.2f} {M}</b>\n"
         f"Оборот: <b>{s['turnover']:,} {M}</b>\n\n"
         "Пополнение и вывод доступны через меню ниже."
     ).replace(",", " ")
@@ -861,7 +861,7 @@ async def start_handler(message: Message):
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("menu:"))
 async def menu_callbacks(callback: CallbackQuery):
-    uid=callback.from_user.id; ensure_user(uid)
+    uid=callback.from_user.id; sync_profile(uid, callback.from_user.username)
     parts=callback.data.split(":")
     action=parts[1]
     if action=="adjust":
@@ -887,7 +887,7 @@ async def menu_callbacks(callback: CallbackQuery):
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("profile:"))
 async def profile_callbacks(callback: CallbackQuery):
-    uid=callback.from_user.id; action=callback.data.split(":",1)[1]
+    uid=callback.from_user.id; sync_profile(uid, callback.from_user.username); action=callback.data.split(":",1)[1]
     if action=="games":
         rows=get_game_history(uid,10)
         text="╭────────────────────╮\n       <tg-emoji emoji-id='5426896538062332283'>🎮</tg-emoji> | ИСТОРИЯ ИГР\n╰────────────────────╯\n\n"
@@ -900,7 +900,7 @@ async def profile_callbacks(callback: CallbackQuery):
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("wallet:"))
 async def wallet_callbacks(callback: CallbackQuery):
-    uid=callback.from_user.id; action=callback.data.split(":",1)[1]
+    uid=callback.from_user.id; sync_profile(uid, callback.from_user.username); action=callback.data.split(":",1)[1]
     if action=="history":
         p=get_payment_history(uid,10); w=get_withdrawal_history(uid,10)
         text="╭────────────────────╮\n       📜 | ИСТОРИЯ\n╰────────────────────╯\n\n"
@@ -917,7 +917,7 @@ async def wallet_callbacks(callback: CallbackQuery):
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("game:"))
 async def game_callbacks(callback: CallbackQuery):
-    uid=callback.from_user.id; g=callback.data.split(":",1)[1]; ensure_user(uid)
+    uid=callback.from_user.id; sync_profile(uid, callback.from_user.username); g=callback.data.split(":",1)[1]; ensure_user(uid)
     if g=="slot":
         bot_sessions[uid]={"step":"slot_amount"}
         await callback.message.answer("╭────────────────────╮\n       <tg-emoji emoji-id='5384509325429463744'>🎰</tg-emoji> SLOTS\n╰────────────────────╯\n\n💎 Ставка:\n\nМинимальная ставка: <b>10 ₽</b>\nМаксимальная ставка: <b>5000 ₽</b>\n\nОтправьте сумму одним сообщением.")
@@ -1033,7 +1033,7 @@ async def dice_confirm(callback: CallbackQuery):
 # ============================================================
 
 REF_GAMES = {
-    "tower": "🗼 Tower", "knb": "✊ КНБ", "keno": "🔢 Keno", "blackjack": "🃏 Blackjack",
+    "mines": "💣 Mines", "tower": "🗼 Tower", "knb": "✊ КНБ", "keno": "🔢 Keno", "blackjack": "🃏 Blackjack",
     "baccarat": "🃏 Baccarat", "plinko": "🔻 Plinko", "even": "⚖️ Even", "sector": "🎡 Сектор",
     "duel": "⚔️ Дуэль", "higher_lower": "↕️ Больше-Меньше", "hilo": "🏹 Hi-Lo", "penalty": "🥅 Пенальти",
 }
@@ -1074,6 +1074,7 @@ def _cards_text(cards):
 @dp.callback_query(lambda c: c.data and c.data.startswith("refgame:"))
 async def reference_game_start(callback: CallbackQuery):
     uid = callback.from_user.id
+    sync_profile(uid, callback.from_user.username)
     game = callback.data.split(":", 1)[1]
     if game not in REF_GAMES:
         await callback.answer("Игра недоступна", show_alert=True); return
@@ -1096,6 +1097,7 @@ async def reference_game_start(callback: CallbackQuery):
 async def reference_stake(callback: CallbackQuery):
     _, game, raw = callback.data.split(":", 2)
     uid = callback.from_user.id
+    sync_profile(uid, callback.from_user.username)
     try: stake = int(raw)
     except ValueError: await callback.answer("Некорректная ставка", show_alert=True); return
     if game not in REF_GAMES or not 10 <= stake <= 5000:
@@ -1148,6 +1150,7 @@ async def _show_ref_options(message: Message, uid: int, game: str, stake: int):
 @dp.callback_query(lambda c: c.data and c.data.startswith("refopt:"))
 async def reference_game_option(callback: CallbackQuery):
     uid = callback.from_user.id
+    sync_profile(uid, callback.from_user.username)
     _, game, option = callback.data.split(":", 2)
     s = bot_sessions.get(uid, {})
     if s.get("game") != game or "stake" not in s:
@@ -1264,6 +1267,7 @@ async def reference_blackjack(callback: CallbackQuery):
 @dp.callback_query(lambda c: c.data and c.data.startswith("admin:"))
 async def admin_callbacks(callback: CallbackQuery):
     uid=callback.from_user.id
+    sync_profile(uid, callback.from_user.username)
     if not is_admin(uid):
         await callback.answer("Доступ запрещен", show_alert=True); return
     parts=callback.data.split(":",2); action=parts[1]
@@ -1291,10 +1295,12 @@ async def admin_callbacks(callback: CallbackQuery):
         try: target=int(parts[2])
         except ValueError: await callback.answer("Некорректный ID",show_alert=True); return
         profile=get_user_profile(target)
+        if not profile and target > 0:
+            profile=get_user_profile_by_app_id(target)
         if not profile: await callback.answer("Пользователь не найден",show_alert=True); return
         stats=profile['stats']
         entries=get_user_ledger(target,20)
-        text=(f"👤 <b>ПОЛЬЗОВАТЕЛЬ</b>\n\nTelegram ID: <code>{profile['telegram_id']}</code>\n"
+        text=(f"👤 <b>ПОЛЬЗОВАТЕЛЬ</b>\n\nApp User ID: <code>{profile.get('id','—')}</code>\nTelegram ID: <code>{profile['telegram_id']}</code>\n"
               f"Username: @{profile.get('username') or '—'}\nБаланс: <b>{profile['balance']:.2f} ₽</b>\n\n"
               f"Игры: {stats['games']} · Победы: {stats['wins']} · Поражения: {stats['losses']}\n"
               f"Winrate: {stats['winrate']}%\nОборот: {stats['turnover']} ₽\nВыиграно: {stats['payouts']} ₽\nMax Win: {stats['max_win']} ₽\n\n"

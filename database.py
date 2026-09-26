@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from decimal import Decimal, ROUND_HALF_UP
 import threading
 import time
 from pathlib import Path
@@ -138,21 +139,22 @@ def sync_profile(user_id: int, username: str | None = None) -> None:
     ensure_user(user_id, username)
 
 
-def get_balance(user_id: int) -> int:
+def get_balance(user_id: int) -> float:
     ensure_user(user_id)
     if _is_pg():
         with _LOCK, _pg_conn() as c:
             uid = _pg_user_id(c, user_id)
             row = c.execute('SELECT COALESCE(SUM("amount"),0) AS balance FROM "LedgerEntry" WHERE "userId"=%s', (uid,)).fetchone()
-            return int(round(float(row['balance'] or 0)))
+            value = Decimal(str(row['balance'] or '0')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            return float(value)
     with _LOCK, _sqlite_conn() as c:
         row = c.execute('SELECT balance_rub FROM users WHERE user_id=?', (int(user_id),)).fetchone()
-        return int(row[0] if row else 0)
+        return float(row[0] if row else 0)
 
 
-def change_balance(user_id: int, amount: int, reason: str = 'bot_balance_change') -> int:
-    amount = int(amount)
-    if amount == 0:
+def change_balance(user_id: int, amount: int | float | Decimal, reason: str = 'bot_balance_change') -> float:
+    amount_d = Decimal(str(amount)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    if amount_d == 0:
         return get_balance(user_id)
     ensure_user(user_id)
     if _is_pg():
@@ -160,17 +162,22 @@ def change_balance(user_id: int, amount: int, reason: str = 'bot_balance_change'
             uid = _pg_user_id(c, user_id)
             c.execute('SELECT id FROM "User" WHERE id=%s FOR UPDATE', (uid,))
             row = c.execute('SELECT COALESCE(SUM("amount"),0) AS balance FROM "LedgerEntry" WHERE "userId"=%s', (uid,)).fetchone()
-            current = float(row['balance'] or 0)
-            if current + amount < -0.000001:
+            current = Decimal(str(row['balance'] or '0')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            if current + amount_d < 0:
                 raise ValueError('Insufficient player balance')
-            c.execute('INSERT INTO "LedgerEntry" ("userId","amount","reason") VALUES (%s,%s,%s)', (uid, f'{amount:.2f}', reason))
+            c.execute('INSERT INTO "LedgerEntry" ("userId","amount","reason") VALUES (%s,%s,%s)', (uid, format(amount_d, 'f'), reason))
             row = c.execute('SELECT COALESCE(SUM("amount"),0) AS balance FROM "LedgerEntry" WHERE "userId"=%s', (uid,)).fetchone()
-            return int(round(float(row['balance'] or 0)))
+            value = Decimal(str(row['balance'] or '0')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            return float(value)
+    amount_i = int(amount_d)
+    if amount_d != Decimal(amount_i):
+        raise ValueError('SQLite fallback supports whole-unit balances only')
     with _LOCK, _sqlite_conn() as c:
-        cur = c.execute('UPDATE users SET balance_rub=balance_rub+?,updated_at=? WHERE user_id=? AND balance_rub+?>=0', (amount, int(time.time()), int(user_id), amount))
+        cur = c.execute('UPDATE users SET balance_rub=balance_rub+?,updated_at=? WHERE user_id=? AND balance_rub+?>=0', (amount_i, int(time.time()), int(user_id), amount_i))
         if cur.rowcount != 1:
             raise ValueError('Insufficient player balance')
-        return get_balance(user_id)
+        row = c.execute('SELECT balance_rub FROM users WHERE user_id=?', (int(user_id),)).fetchone()
+        return float(row[0] if row else 0)
 
 
 def subtract_balance(user_id: int, amount: int, reason: str = 'game_bet') -> bool:
@@ -366,3 +373,23 @@ def get_user_profile(telegram_id:int):
             if not row:return None
             profile=dict(row); profile['balance']=float(profile['balance'] or 0); profile['stats']=get_user_stats(telegram_id); return profile
     return {'telegram_id':telegram_id,'balance':get_balance(telegram_id),'stats':get_user_stats(telegram_id)}
+
+
+
+def get_user_profile_by_app_id(app_user_id: int):
+    if not _is_pg():
+        return None
+    with _LOCK, _pg_conn() as c:
+        row = c.execute(
+            'SELECT u.id,u."telegramId" AS telegram_id,u.username,u."createdAt" AS created_at,u."lastBet" AS last_bet,COALESCE((SELECT SUM(l."amount") FROM "LedgerEntry" l WHERE l."userId"=u.id),0) AS balance FROM "User" u WHERE u.id=%s',
+            (int(app_user_id),),
+        ).fetchone()
+        if not row:
+            return None
+        profile = dict(row)
+        profile['balance'] = float(Decimal(str(profile['balance'] or '0')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+        if profile.get('telegram_id'):
+            profile['stats'] = get_user_stats(int(profile['telegram_id']))
+        else:
+            profile['stats'] = {'games':0,'wins':0,'losses':0,'winrate':0,'turnover':0,'payouts':0,'max_win':0}
+        return profile
