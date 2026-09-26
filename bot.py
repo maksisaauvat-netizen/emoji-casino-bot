@@ -17,14 +17,14 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, CallbackQuery, FSInputFile
+from aiogram.types import Message, Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, CallbackQuery, FSInputFile, ReplyKeyboardMarkup, KeyboardButton
 
 from admin import is_admin
 from database import (
-    init_db, ensure_user, get_balance, change_balance, subtract_balance,
+    init_db, ensure_user, sync_profile, get_balance, change_balance, subtract_balance,
     get_user_stats, get_game_history, get_payment_history,
     get_withdrawal_history, create_withdrawal, record_game,
-    get_audit_logs, get_all_users, get_all_payments, log_event,
+    get_audit_logs, get_all_users, get_all_payments, get_user_profile, get_user_ledger, get_ledger_activity, log_event,
     approve_withdrawal, reject_withdrawal,
 )
 from payments import create_invoice, process_paid_invoice, get_invoice
@@ -608,7 +608,7 @@ async def action(p: Action):
         g["free_spins"]-=1
         payout=int(round(g["stake"]*mult))
         g["free_win"]+=payout
-        if payout: change_balance(uid,payout)
+        if payout: change_balance(uid,payout, f"game_payout:{game}" if "game" in locals() else "game_payout")
         if more: g["free_spins"]+=4
         if g["free_spins"]==0:
             total=g["total_payout"]+g["free_win"]
@@ -741,6 +741,16 @@ def _menu_keyboard(user_id: int):
     ]
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
+def _bottom_keyboard():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🤡 Play & Win")],
+            [KeyboardButton(text="🧳 Кошелёк"), KeyboardButton(text="💵 Профиль")],
+        ],
+        resize_keyboard=True,
+        is_persistent=True,
+    )
+
 def _profile_keyboard(user_id: int):
     rows = [
         [InlineKeyboardButton(text="История игр", callback_data="profile:games"),
@@ -761,13 +771,15 @@ def _wallet_keyboard():
     ])
 
 def _games_keyboard():
+    # Telegram bot mirrors the supplied reference: games live in the bot,
+    # while the Mini App button is intentionally not shown here.
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎰 • Играть в приложении", web_app=WebAppInfo(url=WEBAPP_URL))],
-        [InlineKeyboardButton(text="🎰 SLOTS", callback_data="game:slot")],
-        [InlineKeyboardButton(text="💣 MINES", callback_data="game:mines")],
-        [InlineKeyboardButton(text="🎲 DICE", callback_data="game:dice")],
-        [InlineKeyboardButton(text="🚀 CRASH", callback_data="game:crash"), InlineKeyboardButton(text="🎡 x50", callback_data="game:x50")],
-        [InlineKeyboardButton(text="⚡ Upgrader", callback_data="game:upgrader")],
+        [InlineKeyboardButton(text="💣 Mines", callback_data="refgame:mines"), InlineKeyboardButton(text="🗼 Tower", callback_data="refgame:tower"), InlineKeyboardButton(text="✊ КНБ", callback_data="refgame:knb")],
+        [InlineKeyboardButton(text="🔢 Keno", callback_data="refgame:keno"), InlineKeyboardButton(text="🔻 Plinko", callback_data="refgame:plinko"), InlineKeyboardButton(text="⚖️ Even", callback_data="refgame:even")],
+        [InlineKeyboardButton(text="🎡 Сектор", callback_data="refgame:sector"), InlineKeyboardButton(text="⚔️ Дуэль", callback_data="refgame:duel")],
+        [InlineKeyboardButton(text="↕️ Больше-Меньше", callback_data="refgame:higher_lower")],
+        [InlineKeyboardButton(text="🏹 Hi-Lo", callback_data="refgame:hilo"), InlineKeyboardButton(text="🥅 Пенальти", callback_data="refgame:penalty")],
+        [InlineKeyboardButton(text="🃏 Blackjack", callback_data="refgame:blackjack"), InlineKeyboardButton(text="🃏 Baccarat", callback_data="refgame:baccarat")],
         [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:home")],
     ])
 
@@ -781,20 +793,24 @@ async def _edit_menu(callback: CallbackQuery, text: str, markup: InlineKeyboardM
             await callback.message.answer(text, reply_markup=markup)
 
 def _profile_text(uid: int) -> str:
-    s=get_user_stats(uid); b=get_balance(uid)
+    s=get_user_stats(uid); b=get_balance(uid); p=get_user_profile(uid) or {}
+    username=p.get("username") or "—"
+    app_id=p.get("id") or "—"
     return (
         "╭────────────────────╮\n"
-        "       <tg-emoji emoji-id='5116116063188157350'>👤</tg-emoji> | PROFILE\n"
+        "       👤 | PROFILE\n"
         "╰────────────────────╯\n\n"
-        f"🆔 ID: <code>{uid}</code>\n\n"
-        f"<tg-emoji emoji-id='5278467510604160626'>💰</tg-emoji> | BALANCE:\n└ ‘{b:,} <tg-emoji emoji-id='5231449120635370684'>₽</tg-emoji>’\n\n"
-        f"<tg-emoji emoji-id='5426896538062332283'>🎮</tg-emoji> | ИГРЫ\n└ ‘{s['games']}’\n\n"
-        f"<tg-emoji emoji-id='5188344996356448758'>🏆</tg-emoji> | ПОБЕДЫ\n└ ‘{s['wins']}’\n\n"
-        f"<tg-emoji emoji-id='5454350746407419714'>❌</tg-emoji> | ПОРАЖЕНИЯ\n└ ‘{s['losses']}’\n\n"
-        f"<tg-emoji emoji-id='5429651785352501917'>📈</tg-emoji> | WINRATE\n└ ‘{s['winrate']}%’\n\n"
-        f"💵 | СТАВКИ\n└ ‘{s['turnover']:,} <tg-emoji emoji-id='5231449120635370684'>₽</tg-emoji>’\n\n"
-        f"<tg-emoji emoji-id='5188344996356448758'>🏆</tg-emoji> | ВЫИГРАНО\n└ ‘{s['payouts']:,} <tg-emoji emoji-id='5231449120635370684'>₽</tg-emoji>’\n\n"
-        f"<tg-emoji emoji-id='5375452661036358740'>🔥</tg-emoji> | MAX WIN\n└ ‘{s['max_win']:,} <tg-emoji emoji-id='5231449120635370684'>₽</tg-emoji>’"
+        f"👤 Username: <b>@{username}</b>\n"
+        f"🆔 Telegram ID: <code>{uid}</code>\n"
+        f"🗃 App User ID: <code>{app_id}</code>\n\n"
+        f"💰 BALANCE: <b>{b:,} ₽</b>\n\n"
+        f"🎮 ИГРЫ: <b>{s['games']}</b>\n"
+        f"🏆 ПОБЕДЫ: <b>{s['wins']}</b>\n"
+        f"❌ ПОРАЖЕНИЯ: <b>{s['losses']}</b>\n"
+        f"📈 WINRATE: <b>{s['winrate']}%</b>\n\n"
+        f"💵 СТАВКИ: <b>{s['turnover']:,} ₽</b>\n"
+        f"🏆 ВЫИГРАНО: <b>{s['payouts']:,} ₽</b>\n"
+        f"🔥 MAX WIN: <b>{s['max_win']:,} ₽</b>"
     ).replace(",", " ")
 
 def _wallet_text(uid: int) -> str:
@@ -809,14 +825,27 @@ def _wallet_text(uid: int) -> str:
     ).replace(",", " ")
 
 def _games_text() -> str:
-    return ("╭────────────────────╮\n       <tg-emoji emoji-id='5384509325429463744'>🎰</tg-emoji> GAMES\n╰────────────────────╯\n\n"
-            "<tg-emoji emoji-id='5384509325429463744'>🎰</tg-emoji> • Играть в приложении\n\nВыберите режим игры:")
+    return ("╭────────────────────╮\n       🎮 | PLAY & WIN\n╰────────────────────╯\n\n"
+            "🎯 Игра с Telegram Emojis — бросает бот\n\n"
+            "💣 Mines — открывайте безопасные клетки\n"
+            "🗼 Tower — поднимайтесь по этажам\n"
+            "✊ КНБ — камень, ножницы, бумага\n"
+            "🔢 Keno — выбирайте числа\n"
+            "🔻 Plinko — больше значение → больше коэффициент\n"
+            "⚖️ Even — чётное или нечётное\n"
+            "🎡 Сектор — три сектора по два исхода\n"
+            "⚔️ Дуэль — выбор стороны\n"
+            "↕️ Больше-Меньше — угадайте направление\n"
+            "🏹 Hi-Lo — угадайте следующую карту\n"
+            "🥅 Пенальти — забейте гол\n"
+            "🃏 Blackjack / Baccarat — карточные игры\n\n"
+            "Выберите игру:")
 
 @dp.message(CommandStart())
 async def start_handler(message: Message):
     if not message.from_user: return
     uid=message.from_user.id
-    ensure_user(uid); log_event(uid, "bot_start")
+    sync_profile(uid, message.from_user.username); log_event(uid, "bot_start")
     caption=(
         "╔══════════════════════╗\n"
         "      <tg-emoji emoji-id='5384509325429463744'>🎰</tg-emoji> RESONANT\n"
@@ -825,8 +854,10 @@ async def start_handler(message: Message):
     )
     if START_IMAGE.exists():
         await message.answer_photo(FSInputFile(START_IMAGE), caption=caption, reply_markup=_menu_keyboard(uid))
+        await message.answer("Выберите раздел:", reply_markup=_bottom_keyboard())
     else:
         await message.answer(caption, reply_markup=_menu_keyboard(uid))
+        await message.answer("Выберите раздел:", reply_markup=_bottom_keyboard())
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("menu:"))
 async def menu_callbacks(callback: CallbackQuery):
@@ -931,7 +962,7 @@ async def slot_confirm(callback: CallbackQuery):
     elif roll<0.343: sym=RNG.choice(["🍒","🔔","💎","🍀"]); combo=sym+sym+RNG.choice(["🍋","7️⃣","⭐"]); mult=1.85
     else: combo=RNG.choice(["🍋⭐🍒","🔔🍋💎","🍒7️⃣🔔","⭐🍀🍋"]); mult=0.0
     payout=int(round(stake*mult)) if mult else 0
-    if payout: change_balance(uid,payout)
+    if payout: change_balance(uid,payout, f"game_payout:{game}" if "game" in locals() else "game_payout")
     record_game(uid,"slots_bot",stake,"win" if payout else "loss",mult,payout,rs["round_hash"],rs["server_seed"]); log_event(uid,"game_slots_bot",f"stake={stake} combo={combo} payout={payout}"); bot_sessions.pop(uid,None)
     result=f"🎉 Выигрыш: <b>{payout} ₽</b>" if payout else "<tg-emoji emoji-id='5454350746407419714'>❌</tg-emoji> Проигрыш"
     await callback.message.answer(f"╭────────────────────╮\n       <tg-emoji emoji-id='5384509325429463744'>🎰</tg-emoji> SLOTS\n╰────────────────────╯\n\n💎 Ставка: <b>{stake} ₽</b>\n\n<code>{combo}</code>\n\n{result}\n\nХэш раунда: <code>{rs['round_hash']}</code>\nServer seed: <code>{rs['server_seed']}</code>\n\n🍋🍋🍋 — ×10\n7️⃣7️⃣7️⃣ — ×50\n3 одинаковых — ×3.5\n2 одинаковых — ×1.85\nДругие комбинации — проигрыш.",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎰 Ещё раз",callback_data="game:slot")],[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]])); await callback.answer()
@@ -970,7 +1001,7 @@ async def bot_mines_play(callback: CallbackQuery):
     action=callback.data.split(":",1)[1]
     if action=="cashout":
         if not g["opened"]: await callback.answer("Сначала откройте клетку",show_alert=True); return
-        payout=int(round(g["stake"]*g["multiplier"])); change_balance(uid,payout); rs=g["round"]
+        payout=int(round(g["stake"]*g["multiplier"])); change_balance(uid,payout, f"game_payout:{game}" if "game" in locals() else "game_payout"); rs=g["round"]
         record_game(uid,"mines_bot",g["stake"],"win",g["multiplier"],payout,rs["round_hash"],rs["server_seed"]); log_event(uid,"game_mines_bot",f"stake={g['stake']} payout={payout}"); bot_active_games.pop(uid,None)
         await callback.message.answer(f"🎉 Вы забрали <b>{payout} ₽</b> · x{g['multiplier']:.2f}\nХэш раунда: <code>{rs['round_hash']}</code>\nServer seed: <code>{rs['server_seed']}</code>",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="💣 Ещё раз",callback_data="game:mines")]])); await callback.answer(); return
     idx=int(action.split(":",1)[1])
@@ -991,36 +1022,305 @@ async def dice_confirm(callback: CallbackQuery):
     if not subtract_balance(uid,stake): bot_sessions.pop(uid,None); await callback.message.answer("Недостаточно средств на балансе."); await callback.answer(); return
     rs=new_round("dice_bot",uid); mode=s["mode"]; bet=s["bet"]; d1=1+pf_index(rs,"dice1",6); d2=1+pf_index(rs,"dice2",6); total=d1 if mode=="one" else d1+d2
     won=(total<3 if bet=="lt3" else total>3 if bet=="gt3" else total==7 if bet=="eq7" else total<7 if bet=="lt7" else total>7); mult=5.0 if bet=="eq7" else 1.85; payout=int(round(stake*mult)) if won else 0
-    if payout: change_balance(uid,payout)
+    if payout: change_balance(uid,payout, f"game_payout:{game}" if "game" in locals() else "game_payout")
     record_game(uid,"dice_bot",stake,"win" if won else "loss",mult if won else 0,payout,rs["round_hash"],rs["server_seed"]); log_event(uid,"game_dice_bot",f"stake={stake} dice={d1},{d2} bet={bet} payout={payout}"); bot_sessions.pop(uid,None)
     rolls=f"🎲 {d1}" if mode=="one" else f"🎲 {d1} + {d2} = <b>{total}</b>"; result=f"🎉 Выигрыш: <b>{payout} ₽</b>" if payout else "<tg-emoji emoji-id='5454350746407419714'>❌</tg-emoji> Проигрыш"
     await callback.message.answer(f"╭────────────────────╮\n       🎲 DICE\n╰────────────────────╯\n\n{rolls}\n\n{result}\n\nХэш раунда: <code>{rs['round_hash']}</code>\nServer seed: <code>{rs['server_seed']}</code>",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎲 Ещё раз",callback_data="game:dice")],[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]])); await callback.answer()
+
+
+# ============================================================
+# Telegram bot: reference games (the games from the supplied video)
+# ============================================================
+
+REF_GAMES = {
+    "tower": "🗼 Tower", "knb": "✊ КНБ", "keno": "🔢 Keno", "blackjack": "🃏 Blackjack",
+    "baccarat": "🃏 Baccarat", "plinko": "🔻 Plinko", "even": "⚖️ Even", "sector": "🎡 Сектор",
+    "duel": "⚔️ Дуэль", "higher_lower": "↕️ Больше-Меньше", "hilo": "🏹 Hi-Lo", "penalty": "🥅 Пенальти",
+}
+
+
+def ref_amount_keyboard(game: str):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="10 ₽", callback_data=f"refstake:{game}:10"), InlineKeyboardButton(text="50 ₽", callback_data=f"refstake:{game}:50"), InlineKeyboardButton(text="100 ₽", callback_data=f"refstake:{game}:100")],
+        [InlineKeyboardButton(text="500 ₽", callback_data=f"refstake:{game}:500"), InlineKeyboardButton(text="1000 ₽", callback_data=f"refstake:{game}:1000")],
+        [InlineKeyboardButton(text="⬅️ Игры", callback_data="menu:games")],
+    ])
+
+
+def _card_value(card: str) -> int:
+    return cv(card)
+
+
+def _ref_finish(uid: int, game: str, stake: int, won: bool, multiplier: float, rs: dict, details: dict | None = None):
+    payout = int(round(stake * multiplier)) if won else 0
+    if payout:
+        change_balance(uid, payout, f"game_{game}_win")
+    record_game(uid, game, stake, "win" if won else "loss", multiplier if won else 0, payout, rs["round_hash"], rs["server_seed"], details or {})
+    log_event(uid, f"game_{game}", f"stake={stake} result={'win' if won else 'loss'} payout={payout}")
+    return payout
+
+
+def _result_keyboard(game: str):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎮 Ещё раз", callback_data=f"refgame:{game}")],
+        [InlineKeyboardButton(text="⬅️ Игры", callback_data="menu:games")],
+    ])
+
+
+def _cards_text(cards):
+    return " ".join(cards)
+
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("refgame:"))
+async def reference_game_start(callback: CallbackQuery):
+    uid = callback.from_user.id
+    game = callback.data.split(":", 1)[1]
+    if game not in REF_GAMES:
+        await callback.answer("Игра недоступна", show_alert=True); return
+    if uid in bot_active_games:
+        await callback.answer("Сначала завершите текущую игру", show_alert=True); return
+    if game == "mines":
+        bot_sessions[uid] = {"step": "mines_amount"}
+        await callback.message.answer("💣 <b>MINES</b>\n\nВведите ставку: <b>10–5000 ₽</b>.", reply_markup=ref_amount_keyboard(game))
+        await callback.answer()
+        return
+    bot_sessions[uid] = {"step": "ref_amount", "game": game}
+    await callback.message.answer(
+        f"<b>{REF_GAMES[game]}</b>\n\nВведите ставку одним сообщением или выберите сумму ниже.\nМинимум: <b>10 ₽</b> · максимум: <b>5000 ₽</b>",
+        reply_markup=ref_amount_keyboard(game),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("refstake:"))
+async def reference_stake(callback: CallbackQuery):
+    _, game, raw = callback.data.split(":", 2)
+    uid = callback.from_user.id
+    try: stake = int(raw)
+    except ValueError: await callback.answer("Некорректная ставка", show_alert=True); return
+    if game not in REF_GAMES or not 10 <= stake <= 5000:
+        await callback.answer("Некорректная ставка", show_alert=True); return
+    if game == "mines":
+        bot_sessions[uid] = {"step": "mines_count", "stake": stake}
+        rows=[[InlineKeyboardButton(text=str(a),callback_data=f"mines:count:{a}") for a in range(2,14)], [InlineKeyboardButton(text=str(a),callback_data=f"mines:count:{a}") for a in range(14,25)]]
+        await callback.message.answer(f"💣 <b>MINES</b>\nСтавка: <b>{stake} ₽</b>\nВыберите количество бомб:", reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+        await callback.answer()
+        return
+    bot_sessions[uid] = {"step": "ref_options", "game": game, "stake": stake}
+    await _show_ref_options(callback.message, uid, game, stake)
+    await callback.answer()
+
+
+async def _show_ref_options(message: Message, uid: int, game: str, stake: int):
+    if game == "tower":
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🟢 2 уровня", callback_data="refopt:tower:2"), InlineKeyboardButton(text="🟡 3 уровня", callback_data="refopt:tower:3")], [InlineKeyboardButton(text="🔴 4 уровня", callback_data="refopt:tower:4")]])
+    elif game == "knb":
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🪨 Камень", callback_data="refopt:knb:rock"), InlineKeyboardButton(text="📄 Бумага", callback_data="refopt:paper")], [InlineKeyboardButton(text="✂️ Ножницы", callback_data="refopt:knb:scissors")]])
+    elif game == "keno":
+        kb = None
+    elif game == "blackjack":
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🃏 Начать", callback_data="refopt:blackjack:start")]])
+    elif game == "baccarat":
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="👤 Игрок", callback_data="refopt:baccarat:player"), InlineKeyboardButton(text="🏦 Банкир", callback_data="refopt:baccarat:banker")], [InlineKeyboardButton(text="⚖️ Ничья", callback_data="refopt:baccarat:tie")]])
+    elif game == "plinko":
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🟢 Low", callback_data="refopt:plinko:low"), InlineKeyboardButton(text="🟡 Medium", callback_data="refopt:plinko:medium"), InlineKeyboardButton(text="🔴 High", callback_data="refopt:plinko:high")]])
+    elif game == "even":
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="2️⃣ Чёт", callback_data="refopt:even:even"), InlineKeyboardButton(text="1️⃣ Нечёт", callback_data="refopt:even:odd")]])
+    elif game == "sector":
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="1️⃣ Сектор 1", callback_data="refopt:sector:1"), InlineKeyboardButton(text="2️⃣ Сектор 2", callback_data="refopt:sector:2")], [InlineKeyboardButton(text="3️⃣ Сектор 3", callback_data="refopt:sector:3")]])
+    elif game == "duel":
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔵 Сторона A", callback_data="refopt:duel:a"), InlineKeyboardButton(text="🔴 Сторона B", callback_data="refopt:duel:b")]])
+    elif game in {"higher_lower", "hilo"}:
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬆️ Выше", callback_data=f"refopt:{game}:higher"), InlineKeyboardButton(text="⬇️ Ниже", callback_data=f"refopt:{game}:lower")]])
+    elif game == "penalty":
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Лево", callback_data="refopt:penalty:left"), InlineKeyboardButton(text="⬆️ Центр", callback_data="refopt:penalty:center"), InlineKeyboardButton(text="➡️ Право", callback_data="refopt: right")]])
+        # Telegram callback data must not contain spaces; rebuild the last button.
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Лево", callback_data="refopt:penalty:left"), InlineKeyboardButton(text="⬆️ Центр", callback_data="refopt:penalty:center"), InlineKeyboardButton(text="➡️ Право", callback_data="refopt:penalty:right")]])
+    else:
+        kb = InlineKeyboardMarkup(inline_keyboard=[])
+    if game == "keno":
+        bot_sessions[uid]["step"] = "ref_keno_numbers"
+        await message.answer(f"🔢 <b>Keno</b>\n\nСтавка: <b>{stake} ₽</b>\nОтправьте 5 разных чисел от 1 до 40 через пробел.\nНапример: <code>3 7 12 21 38</code>")
+    else:
+        await message.answer(f"<b>{REF_GAMES[game]}</b>\nСтавка: <b>{stake} ₽</b>\n\nВыберите действие:", reply_markup=kb)
+
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("refopt:"))
+async def reference_game_option(callback: CallbackQuery):
+    uid = callback.from_user.id
+    _, game, option = callback.data.split(":", 2)
+    s = bot_sessions.get(uid, {})
+    if s.get("game") != game or "stake" not in s:
+        await callback.answer("Сессия не найдена", show_alert=True); return
+    stake = int(s["stake"])
+    if not subtract_balance(uid, stake, f"game_{game}_bet"):
+        bot_sessions.pop(uid, None); await callback.answer("Недостаточно средств", show_alert=True); return
+    rs = new_round(game, uid)
+
+    if game == "tower":
+        levels = int(option)
+        safe = [pf_index(rs, "tower", 2, i) for i in range(levels)]
+        bot_active_games[uid] = {"type":"tower","stake":stake,"levels":levels,"floor":0,"safe":safe,"round":rs}
+        bot_sessions.pop(uid,None)
+        await callback.message.answer(f"🗼 <b>Tower</b>\nСтавка: <b>{stake} ₽</b>\nУровень 1 из {levels}. Выберите дверь:", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="◀️ Левая",callback_data="reftower:left"),InlineKeyboardButton(text="Правая ▶️",callback_data="reftower:right")],[InlineKeyboardButton(text="💰 Забрать",callback_data="reftower:cashout")]]))
+    elif game == "knb":
+        choices=["rock","paper","scissors"]; bot_choice=choices[pf_index(rs,"knb",3)]; win=(option != bot_choice and ((option,bot_choice) in {("rock","scissors"),("paper","rock"),("scissors","paper")})); tie=option==bot_choice; mult=1.9 if win else (1.0 if tie else 0)
+        if tie:
+            change_balance(uid, stake, "game_knb_refund")
+            payout=stake
+            record_game(uid,game,stake,"win",1.0,payout,rs["round_hash"],rs["server_seed"],{"player":option,"bot":bot_choice})
+        else:
+            payout=_ref_finish(uid,game,stake,win,mult,rs,{"player":option,"bot":bot_choice})
+        bot_sessions.pop(uid,None); result="🤝 Ничья — ставка возвращена" if tie else (f"🎉 Выигрыш: <b>{payout} ₽</b>" if win else "❌ Проигрыш")
+        await callback.message.answer(f"✊ <b>КНБ</b>\nВы: {option}\nБот: {bot_choice}\n\n{result}\n\nХэш: <code>{rs['round_hash']}</code>\nSeed: <code>{rs['server_seed']}</code>",reply_markup=_result_keyboard(game))
+    elif game == "baccarat":
+        d=deck(rs); player=d[:2]; banker=d[2:4]; pv=sum(_card_value(c) for c in player)%10; bv=sum(_card_value(c) for c in banker)%10
+        winner="tie" if pv==bv else ("player" if pv>bv else "banker")
+        won=option==winner; mult=8.0 if option=="tie" else 1.95; payout=_ref_finish(uid,game,stake,won,mult,rs,{"player":player,"banker":banker,"player_value":pv,"banker_value":bv,"winner":winner})
+        bot_sessions.pop(uid,None); await callback.message.answer(f"🃏 <b>Baccarat</b>\nИгрок: {_cards_text(player)} = <b>{pv}</b>\nБанкир: {_cards_text(banker)} = <b>{bv}</b>\n\nПобедитель: <b>{winner}</b>\n" + (f"🎉 Выигрыш: <b>{payout} ₽</b>" if won else "❌ Проигрыш") + f"\n\nХэш: <code>{rs['round_hash']}</code>\nSeed: <code>{rs['server_seed']}</code>",reply_markup=_result_keyboard(game))
+    elif game == "plinko":
+        tables={"low":[0.5,0.8,1.0,1.2,1.5,2.0],"medium":[0.2,0.5,1.0,1.8,3.0,5.0],"high":[0.1,0.3,0.7,2.0,5.0,10.0]}; vals=tables[option]; mult=vals[pf_index(rs,"plinko",len(vals))]; won=mult>=1; payout=_ref_finish(uid,game,stake,won,mult,rs,{"risk":option,"multiplier":mult})
+        bot_sessions.pop(uid,None); await callback.message.answer(f"🔻 <b>Plinko</b>\nРиск: <b>{option}</b>\nКоэффициент: <b>x{mult:.2f}</b>\n\n"+(f"🎉 Выигрыш: <b>{payout} ₽</b>" if payout else "❌ Проигрыш"),reply_markup=_result_keyboard(game))
+    elif game == "even":
+        n=1+pf_index(rs,"even",100); won=(n%2==0)==(option=="even"); payout=_ref_finish(uid,game,stake,won,1.9,rs,{"number":n,"choice":option}); bot_sessions.pop(uid,None); await callback.message.answer(f"⚖️ <b>Even</b>\nВыпало: <b>{n}</b>\n\n"+(f"🎉 Выигрыш: <b>{payout} ₽</b>" if won else "❌ Проигрыш"),reply_markup=_result_keyboard(game))
+    elif game == "sector":
+        n=1+pf_index(rs,"sector",3); won=int(option)==n; payout=_ref_finish(uid,game,stake,won,2.8,rs,{"sector":n}); bot_sessions.pop(uid,None); await callback.message.answer(f"🎡 <b>Сектор</b>\nВыпал сектор: <b>{n}</b>\n\n"+(f"🎉 Выигрыш: <b>{payout} ₽</b>" if won else "❌ Проигрыш"),reply_markup=_result_keyboard(game))
+    elif game == "duel":
+        n=pf_index(rs,"duel",2); winner="a" if n==0 else "b"; won=option==winner; payout=_ref_finish(uid,game,stake,won,1.9,rs,{"winner":winner}); bot_sessions.pop(uid,None); await callback.message.answer(f"⚔️ <b>Дуэль</b>\nПобедила сторона: <b>{winner.upper()}</b>\n\n"+(f"🎉 Выигрыш: <b>{payout} ₽</b>" if won else "❌ Проигрыш"),reply_markup=_result_keyboard(game))
+    elif game == "penalty":
+        keeper=["left","center","right"][pf_index(rs,"keeper",3)]; won=option!=keeper; payout=_ref_finish(uid,game,stake,won,2.7,rs,{"shot":option,"keeper":keeper}); bot_sessions.pop(uid,None); await callback.message.answer(f"🥅 <b>Пенальти</b>\nВратарь прыгнул: <b>{keeper}</b>\n\n"+(f"⚽ Гол! Выигрыш: <b>{payout} ₽</b>" if won else "🧤 Вратарь отбил удар"),reply_markup=_result_keyboard(game))
+    elif game in {"higher_lower","hilo"}:
+        d=deck(rs); first=d[0]; bot_active_games[uid]={"type":game,"stake":stake,"card":first,"deck":d[1:],"round":rs}; bot_sessions.pop(uid,None)
+        await callback.message.answer(f"{REF_GAMES[game]}\nПервая карта: <b>{first}</b>\n\nВыберите, следующая будет выше или ниже:",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬆️ Выше",callback_data=f"refhl:{game}:higher"),InlineKeyboardButton(text="⬇️ Ниже",callback_data=f"refhl:{game}:lower")],[InlineKeyboardButton(text="💰 Забрать",callback_data=f"refhl:{game}:cashout")]]))
+    elif game == "blackjack":
+        d=deck(rs); player=d[:2]; dealer=d[2:4]; bot_active_games[uid]={"type":"blackjack_ref","stake":stake,"player":player,"dealer":dealer,"deck":d[4:],"round":rs}; bot_sessions.pop(uid,None)
+        await callback.message.answer(f"🃏 <b>Blackjack</b>\nВаши карты: {_cards_text(player)} = <b>{hv(player)}</b>\nДилер: <b>{dealer[0]} ❓</b>\n\nВыберите действие:",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="➕ Ещё",callback_data="refbj:hit"),InlineKeyboardButton(text="✋ Стоп",callback_data="refbj:stand")]]))
+    await callback.answer()
+
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("reftower:"))
+async def reference_tower(callback: CallbackQuery):
+    uid=callback.from_user.id; g=bot_active_games.get(uid)
+    if not g or g.get("type")!="tower": await callback.answer("Игра не найдена",show_alert=True); return
+    action=callback.data.split(":")[1]
+    if action=="cashout":
+        floor=g["floor"]
+        if floor<=0: await callback.answer("Сначала пройдите уровень",show_alert=True); return
+        mult=round(1.25**floor,4); payout=_ref_finish(uid,"tower",g["stake"],True,mult,g["round"],{"levels":g["levels"],"floor":floor}); bot_active_games.pop(uid,None)
+        await callback.message.answer(f"🗼 Cash Out · <b>x{mult:.2f}</b>\nВыигрыш: <b>{payout} ₽</b>",reply_markup=_result_keyboard("tower")); await callback.answer(); return
+    pick=0 if action=="left" else 1
+    if pick!=g["safe"][g["floor"]]:
+        rs=g["round"]; record_game(uid,"tower",g["stake"],"loss",0,0,rs["round_hash"],rs["server_seed"],{"floor":g["floor"]}); bot_active_games.pop(uid,None); await callback.message.answer(f"💥 <b>Tower</b>\nВы выбрали неверную дверь. Ставка проиграна.\n\nХэш: <code>{rs['round_hash']}</code>\nSeed: <code>{rs['server_seed']}</code>",reply_markup=_result_keyboard("tower")); await callback.answer(); return
+    g["floor"]+=1
+    if g["floor"]>=g["levels"]:
+        mult=round(1.25**g["floor"],4); payout=_ref_finish(uid,"tower",g["stake"],True,mult,g["round"],{"floor":g["floor"]}); bot_active_games.pop(uid,None); await callback.message.answer(f"🏆 <b>Tower пройден!</b>\nx{mult:.2f} · Выигрыш <b>{payout} ₽</b>",reply_markup=_result_keyboard("tower")); await callback.answer(); return
+    await callback.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="◀️ Левая",callback_data="reftower:left"),InlineKeyboardButton(text="Правая ▶️",callback_data="reftower:right")],[InlineKeyboardButton(text=f"💰 Забрать x{1.25**g['floor']:.2f}",callback_data="reftower:cashout")]])); await callback.answer("Безопасно")
+
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("refhl:"))
+async def reference_hilo(callback: CallbackQuery):
+    uid=callback.from_user.id; _,game,action=callback.data.split(":")
+    g=bot_active_games.get(uid)
+    if not g or g.get("type")!=game: await callback.answer("Игра не найдена",show_alert=True); return
+    if action=="cashout":
+        # One correct prediction is enough to cash out; otherwise keep current stake.
+        await callback.answer("Сделайте прогноз",show_alert=True); return
+    current=g["card"]; nxt=g["deck"].pop(0); a=_card_value(current); b=_card_value(nxt)
+    won=(b>a if action=="higher" else b<a)
+    if b==a: won=True
+    mult=1.8
+    if not won:
+        rs=g["round"]; record_game(uid,game,g["stake"],"loss",0,0,rs["round_hash"],rs["server_seed"],{"from":current,"to":nxt,"choice":action}); bot_active_games.pop(uid,None); await callback.message.answer(f"{REF_GAMES[game]}\n{current} → {nxt}\n\n❌ Проигрыш",reply_markup=_result_keyboard(game)); await callback.answer(); return
+    g["card"]=nxt; g["wins"]=g.get("wins",0)+1; mult=round(1.8**g["wins"],4)
+    if g["wins"]>=3:
+        payout=_ref_finish(uid,game,g["stake"],True,mult,g["round"],{"wins":g["wins"]}); bot_active_games.pop(uid,None); await callback.message.answer(f"{REF_GAMES[game]}\n{current} → {nxt}\n\n🎉 Выигрыш: <b>{payout} ₽</b> · x{mult:.2f}",reply_markup=_result_keyboard(game)); await callback.answer(); return
+    await callback.message.answer(f"{REF_GAMES[game]}\n{current} → <b>{nxt}</b> · верно!\nТекущий cashout: <b>x{mult:.2f}</b>",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬆️ Выше",callback_data=f"refhl:{game}:higher"),InlineKeyboardButton(text="⬇️ Ниже",callback_data=f"refhl:{game}:lower")],[InlineKeyboardButton(text=f"💰 Забрать x{mult:.2f}",callback_data=f"refhlcash:{game}")]])); await callback.answer()
+
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("refhlcash:"))
+async def reference_hilo_cashout(callback: CallbackQuery):
+    uid=callback.from_user.id; game=callback.data.split(":")[1]; g=bot_active_games.get(uid)
+    if not g or g.get("type")!=game: await callback.answer("Игра не найдена",show_alert=True); return
+    mult=round(1.8**g.get("wins",1),4); payout=_ref_finish(uid,game,g["stake"],True,mult,g["round"],{"wins":g.get("wins",1)}); bot_active_games.pop(uid,None)
+    await callback.message.answer(f"💰 Cash Out · <b>x{mult:.2f}</b>\nВыигрыш: <b>{payout} ₽</b>",reply_markup=_result_keyboard(game)); await callback.answer()
+
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("refbj:"))
+async def reference_blackjack(callback: CallbackQuery):
+    uid=callback.from_user.id; action=callback.data.split(":")[1]; g=bot_active_games.get(uid)
+    if not g or g.get("type")!="blackjack_ref": await callback.answer("Игра не найдена",show_alert=True); return
+    if action=="hit":
+        g["player"].append(g["deck"].pop(0)); value=hv(g["player"])
+        if value>21:
+            rs=g["round"]; record_game(uid,"blackjack",g["stake"],"loss",0,0,rs["round_hash"],rs["server_seed"],{"player":g["player"],"dealer":g["dealer"]}); bot_active_games.pop(uid,None); await callback.message.answer(f"🃏 <b>Blackjack</b>\nВаши карты: {_cards_text(g['player'])} = <b>{value}</b>\n\n❌ Перебор",reply_markup=_result_keyboard("blackjack")); await callback.answer(); return
+        await callback.message.edit_text(f"🃏 <b>Blackjack</b>\nВаши карты: {_cards_text(g['player'])} = <b>{value}</b>\nДилер: <b>{g['dealer'][0]} ❓</b>",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="➕ Ещё",callback_data="refbj:hit"),InlineKeyboardButton(text="✋ Стоп",callback_data="refbj:stand")]])); await callback.answer(); return
+    while hv(g["dealer"])<17: g["dealer"].append(g["deck"].pop(0))
+    pv=hv(g["player"]); dv=hv(g["dealer"]); won=pv>dv or dv>21; tie=pv==dv; mult=1.95 if won else (1.0 if tie else 0)
+    if tie: payout=_ref_finish(uid,"blackjack",g["stake"],True,1.0,g["round"],{"player":g["player"],"dealer":g["dealer"]})
+    else: payout=_ref_finish(uid,"blackjack",g["stake"],won,mult,g["round"],{"player":g["player"],"dealer":g["dealer"]})
+    bot_active_games.pop(uid,None); result="🤝 Возврат ставки" if tie else (f"🎉 Выигрыш: <b>{payout} ₽</b>" if won else "❌ Проигрыш")
+    await callback.message.answer(f"🃏 <b>Blackjack</b>\nВы: {_cards_text(g['player'])} = <b>{pv}</b>\nДилер: {_cards_text(g['dealer'])} = <b>{dv}</b>\n\n{result}",reply_markup=_result_keyboard("blackjack")); await callback.answer()
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("admin:"))
 async def admin_callbacks(callback: CallbackQuery):
     uid=callback.from_user.id
     if not is_admin(uid):
         await callback.answer("Доступ запрещен", show_alert=True); return
-    action=callback.data.split(":",1)[1]
+    parts=callback.data.split(":",2); action=parts[1]
     if action=="home":
         text=("╭────────────────────╮\n       🛠 | ADMIN PANEL\n╰────────────────────╯\n\n"
-              "Логи, пользователи, пополнения и заявки на вывод.")
+              "Панель бота синхронизирована с базой Mini App.\n"
+              "Баланс и профили общие для обоих интерфейсов.")
         markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Логи", callback_data="admin:logs"),
-             InlineKeyboardButton(text="Пользователи", callback_data="admin:users")],
-            [InlineKeyboardButton(text="Пополнения", callback_data="admin:payments"),
-             InlineKeyboardButton(text="Выводы", callback_data="admin:withdrawals")],
-            [InlineKeyboardButton(text="Выдать/снять баланс", callback_data="admin:adjust")],
-            [InlineKeyboardButton(text="⬅️ Профиль", callback_data="menu:profile")]
+            [InlineKeyboardButton(text="👥 Пользователи",callback_data="admin:users"), InlineKeyboardButton(text="📊 Активность",callback_data="admin:activity")],
+            [InlineKeyboardButton(text="💰 Изменить баланс",callback_data="admin:adjust")],
+            [InlineKeyboardButton(text="📝 Логи",callback_data="admin:logs")],
+            [InlineKeyboardButton(text="💳 Пополнения",callback_data="admin:payments"), InlineKeyboardButton(text="💸 Выводы",callback_data="admin:withdrawals")],
+            [InlineKeyboardButton(text="⬅️ Профиль",callback_data="menu:profile")]
         ])
-    elif action=="logs":
-        rows=get_audit_logs(15); text="🛠 ЛОГИ\n\n"+("\n".join(f"#{r['id']} · {r['user_id']} · {r['action']} · {r['details']}" for r in rows) or "—"); markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
     elif action=="users":
-        rows=get_all_users(20); text="👥 ПОЛЬЗОВАТЕЛИ\n\n"+("\n".join(f"{r['user_id']} · {r['balance_rub']} ₽" for r in rows) or "—"); markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
+        rows=get_all_users(25)
+        text="👥 <b>ПОЛЬЗОВАТЕЛИ</b>\n\n" + ("\n".join(f"{r.get('username') or 'без username'} · <code>{r['user_id']}</code> · <b>{float(r['balance']):.2f} ₽</b>" for r in rows) or "—")
+        buttons=[]
+        for r in rows[:20]:
+            label=("@"+str(r['username'])) if r.get('username') else str(r['user_id'])
+            buttons.append([InlineKeyboardButton(text=f"👤 {label}",callback_data=f"admin:user:{r['user_id']}")])
+        buttons.append([InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")])
+        markup=InlineKeyboardMarkup(inline_keyboard=buttons)
+    elif action=="user" and len(parts)>2:
+        try: target=int(parts[2])
+        except ValueError: await callback.answer("Некорректный ID",show_alert=True); return
+        profile=get_user_profile(target)
+        if not profile: await callback.answer("Пользователь не найден",show_alert=True); return
+        stats=profile['stats']
+        entries=get_user_ledger(target,20)
+        text=(f"👤 <b>ПОЛЬЗОВАТЕЛЬ</b>\n\nTelegram ID: <code>{profile['telegram_id']}</code>\n"
+              f"Username: @{profile.get('username') or '—'}\nБаланс: <b>{profile['balance']:.2f} ₽</b>\n\n"
+              f"Игры: {stats['games']} · Победы: {stats['wins']} · Поражения: {stats['losses']}\n"
+              f"Winrate: {stats['winrate']}%\nОборот: {stats['turnover']} ₽\nВыиграно: {stats['payouts']} ₽\nMax Win: {stats['max_win']} ₽\n\n"
+              "<b>Последние операции</b>\n" + ("\n".join(f"#{e['id']} · {float(e['amount']):+.2f} ₽ · {e['reason']}" for e in entries) or "—"))
+        markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="💰 Изменить баланс",callback_data=f"admin:adjust:{target}")],[InlineKeyboardButton(text="⬅️ Пользователи",callback_data="admin:users")]])
+    elif action=="activity":
+        rows=get_ledger_activity(40)
+        text="📊 <b>АКТИВНОСТЬ / LEDGER</b>\n\n"+("\n".join(f"#{r['id']} · {r.get('username') or r['user_id']} · <b>{float(r['amount']):+.2f} ₽</b> · {r['reason']}" for r in rows) or "—")
+        markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
+    elif action=="logs":
+        rows=get_audit_logs(40); text="📝 <b>ЛОГИ</b>\n\n"+("\n".join(f"#{r['id']} · {r.get('user_id','—')} · {r['action']} · {r['details']}" for r in rows) or "—"); markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
     elif action=="payments":
-        rows=get_all_payments(20); text="💳 ПОПОЛНЕНИЯ\n\n"+("\n".join(f"#{r['id']} · {r['user_id']} · {r['amount_rub']} ₽ · {r['status']}" for r in rows) or "—"); markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
+        rows=get_all_payments(30); text="💳 <b>ПОПОЛНЕНИЯ</b>\n\n"+("\n".join(f"#{r['id']} · {r['user_id']} · {float(r['amount_rub']):.2f} ₽ · {r['status']}" for r in rows) or "—"); markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
+    elif action=="withdrawals":
+        rows=__import__('database').get_pending_withdrawals(30); text="💸 <b>ВЫВОДЫ</b>\n\n"+("\n".join(f"#{r['id']} · {r['user_id']} · {float(r['amount_rub']):.2f} ₽ · {r['status']}" for r in rows) or "—"); markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
+    elif action=="adjust":
+        target=parts[2] if len(parts)>2 else ""
+        if target:
+            bot_sessions[uid]={"step":"admin_amount","target":int(target)}
+            await callback.message.answer(f"Введите изменение баланса для <code>{target}</code>. Например: <b>+500</b> или <b>-500</b>.")
+            await callback.answer(); return
+        bot_sessions[uid]={"step":"admin_target"}
+        await callback.message.answer("Введите Telegram ID пользователя.")
+        await callback.answer(); return
     else:
-        rows=__import__('database').get_pending_withdrawals(20); text="💸 ВЫВОДЫ\n\n"+("\n".join(f"#{r['id']} · {r['user_id']} · {r['amount_rub']} ₽ · {r['status']}" for r in rows) or "—"); markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
+        await callback.answer("Неизвестный раздел",show_alert=True); return
     await _edit_menu(callback,text,markup); await callback.answer()
 
 # ============================================================
@@ -1047,8 +1347,17 @@ async def upgrade_message_router(message: Message):
     if not message.from_user: return
     uid=message.from_user.id
     session=bot_sessions.get(uid)
+    text=str(message.text or '').strip()
+    if text in {"🤡 Play & Win", "Play & Win"}:
+        await message.answer(_games_text(), reply_markup=_games_keyboard())
+        return
+    if text in {"🧳 Кошелёк", "Кошелёк", "💰 Кошелек", "Кошелек"}:
+        await message.answer(_wallet_text(uid), reply_markup=_wallet_keyboard())
+        return
+    if text in {"💵 Профиль", "Профиль"}:
+        await message.answer(_profile_text(uid), reply_markup=_profile_keyboard(uid))
+        return
     if session:
-        text=str(message.text or '').strip()
         if session.get("step")=="deposit_amount":
             try: amount=float(text.replace(',','.').replace(' ',''))
             except ValueError: amount=0
@@ -1106,6 +1415,36 @@ async def upgrade_message_router(message: Message):
         await message.answer(f"Баланс пользователя <code>{target}</code> изменен на {amount:+d} ₽. Новый баланс: <b>{new_balance} ₽</b>.")
         return
 
+    if session and session.get("step") == "ref_amount":
+        try:
+            amount=int(float(text.replace(',','.').replace(' ','').replace('₽','')))
+        except ValueError:
+            amount=0
+        if not 10 <= amount <= 5000:
+            await message.answer("Ставка должна быть от 10 до 5000 ₽.")
+            return
+        game=session["game"]
+        session.update({"step":"ref_options","stake":amount})
+        await _show_ref_options(message, uid, game, amount)
+        return
+
+    if session and session.get("step") == "ref_keno_numbers":
+        parts=text.replace(',',' ').split()
+        try: nums=[int(x) for x in parts]
+        except ValueError: nums=[]
+        if len(nums)!=5 or len(set(nums))!=5 or any(x<1 or x>40 for x in nums):
+            await message.answer("Нужно ровно 5 разных чисел от 1 до 40. Например: 3 7 12 21 38")
+            return
+        stake=int(session["stake"])
+        if not subtract_balance(uid,stake,"game_keno_bet"):
+            bot_sessions.pop(uid,None); await message.answer("Недостаточно средств на балансе."); return
+        rs=new_round("keno",uid); draw=[]; available=list(range(1,41))
+        for i in range(5):
+            j=pf_index(rs,"keno",len(available),i); draw.append(available.pop(j))
+        hits=len(set(nums)&set(draw)); pays={0:0,1:0,2:1.0,3:2.5,4:8.0,5:20.0}; mult=pays[hits]; payout=_ref_finish(uid,"keno",stake,mult>0,mult,rs,{"numbers":nums,"draw":draw,"hits":hits}); bot_sessions.pop(uid,None)
+        await message.answer(f"🔢 <b>Keno</b>\nВаши: <code>{' '.join(map(str,sorted(nums)))}</code>\nТираж: <code>{' '.join(map(str,sorted(draw)))}</code>\nСовпадений: <b>{hits}</b>\n\n"+(f"🎉 Выигрыш: <b>{payout} ₽</b> · x{mult:.2f}" if payout else "❌ Проигрыш"),reply_markup=_result_keyboard("keno"))
+        return
+
     if uid not in upgrade_sessions:
         return
     s=upgrade_sessions[uid]
@@ -1148,7 +1487,7 @@ async def run_upgrade_bot(message: Message, uid: int):
         await message.answer("Недостаточно средств на балансе."); upgrade_sessions.pop(uid,None); return
     rs=new_round("upgrader",uid); roll=pf_unit(rs,"upgrade"); won=roll<pct/100
     payout=int(round(stake*mult)) if won else 0
-    if payout: change_balance(uid,payout)
+    if payout: change_balance(uid,payout, f"game_payout:{game}" if "game" in locals() else "game_payout")
     record_game(uid,"upgrader",stake,"win" if won else "loss",mult if won else 0,payout,rs["round_hash"],rs["server_seed"])
     log_event(uid, "game_upgrader", f"stake={stake} result={'win' if won else 'loss'} payout={payout}")
     await message.answer(

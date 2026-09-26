@@ -2,7 +2,7 @@ import os
 
 
 def _admin_ids() -> set[int]:
-    raw = os.getenv("ADMIN_IDS", "")
+    raw = os.getenv("ADMIN_IDS", "") or os.getenv("ADMIN_TELEGRAM_IDS", "") or os.getenv("ADMIN_TELEGRAM_ID", "")
     result: set[int] = set()
     for item in raw.replace(";", ",").split(","):
         item = item.strip()
@@ -12,8 +12,6 @@ def _admin_ids() -> set[int]:
             result.add(int(item))
         except ValueError:
             continue
-    # Keep the historical admin ID used by the supplied bot only as an opt-in
-    # fallback. Set ADMIN_IDS in production instead.
     legacy = os.getenv("LEGACY_ADMIN_ID", "8244079903")
     if os.getenv("ALLOW_LEGACY_ADMIN", "false").lower() == "true":
         try:
