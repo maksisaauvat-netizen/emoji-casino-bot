@@ -1,7 +1,9 @@
 import hashlib
 import hmac
 import json
+import logging
 import os
+import traceback
 import random
 import secrets
 import time
@@ -44,6 +46,7 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 app = FastAPI(title="Resonant Casino")
+logger = logging.getLogger("resonant_casino")
 # Images are kept in the project root (not in an assets/ directory).
 ROOT_DIR = Path(__file__).resolve().parent
 
@@ -408,7 +411,15 @@ def hv(hand):
 
 @app.get("/")
 async def root():
-    return FileResponse(str(Path(__file__).with_name("index.html")))
+    # The Telegram bot is an API/webhook service; there is no frontend
+    # index.html in this deployment. Render health checks should receive
+    # a normal response instead of trying to serve a missing file.
+    return {"ok": True, "service": "telegram-bot"}
+
+
+@app.get("/healthz")
+async def healthz():
+    return {"ok": True}
 
 
 @app.get("/api/config")
@@ -1510,12 +1521,18 @@ async def run_upgrade_bot(message: Message, uid: int):
 @app.post(WEBHOOK_PATH)
 async def webhook(request:Request):
     if request.headers.get("X-Telegram-Bot-Api-Secret-Token")!=WEBHOOK_SECRET:
+        logger.warning("Rejected Telegram webhook request: invalid secret")
         return JSONResponse({"ok":False},status_code=403)
     try:
-        update=Update.model_validate(await request.json())
+        payload = await request.json()
+        update=Update.model_validate(payload)
         await dp.feed_update(bot,update)
         return {"ok":True}
     except Exception as e:
+        # Keep the response useful for Render logs: the previous version
+        # returned only a generic 500, which made handler/database failures
+        # impossible to diagnose from the deployment log.
+        logger.exception("Telegram webhook processing failed: %s", e)
         return JSONResponse({"ok":False,"error":str(e)},status_code=500)
 
 
