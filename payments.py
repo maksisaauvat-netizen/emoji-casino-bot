@@ -85,6 +85,11 @@ async def create_withdrawal_payout(user_id: int, amount_usd: float, spend_id: st
     amount_usd = round(float(amount_usd), 2)
     if amount_usd < MIN_WITHDRAW_USD:
         raise ValueError("Minimum withdrawal is $1.00")
+    if not str(spend_id).strip():
+        raise ValueError("spend_id is required for an idempotent withdrawal")
+    existing = await get_transfers(str(spend_id))
+    if existing:
+        return existing[0]
     return await _api("transfer", {
         "user_id": int(user_id),
         "asset": CRYPTOBOT_ASSET,

@@ -29,7 +29,7 @@ from database import (
     get_user_stats, get_game_history, get_payment_history,
     get_withdrawal_history, create_withdrawal, record_game,
     get_audit_logs, get_all_users, get_all_payments, get_user_profile, get_user_profile_by_app_id, get_user_ledger, get_ledger_activity, log_event,
-    approve_withdrawal, reject_withdrawal, complete_withdrawal,
+    approve_withdrawal, reject_withdrawal, start_withdrawal_processing, complete_withdrawal,
     count_users, get_setting, set_setting,
 )
 from payments import create_invoice, process_paid_invoice, get_invoice, create_withdrawal_payout
@@ -889,12 +889,15 @@ async def withdraw(p: Withdraw):
     if CRYPTOBOT_AUTO_PAYOUT:
         try:
             await approve_withdrawal(result['id'])
-            payout=await create_withdrawal_payout(uid, amount, f"withdrawal-{result['id']}")
+            processing = start_withdrawal_processing(result["id"])
+            if not processing:
+                raise RuntimeError("Withdrawal is already being processed or has changed state")
+            payout=await create_withdrawal_payout(uid, amount, processing["spend_id"])
             result=complete_withdrawal(result['id']) or result
             result['crypto_transfer']=payout
         except Exception as exc:
-            reject_withdrawal(result['id'])
-            raise HTTPException(502, f"CryptoBot payout failed: {exc}")
+            log_event(uid, "withdrawal_payout_error", f"id={result['id']} spend_id={result.get('spend_id','')} error={exc}")
+            raise HTTPException(502, "CryptoBot payout could not be confirmed. The withdrawal remains processing and will be reconciled safely.")
     return {"withdrawal":result,"balance":bal(uid)}
 
 
@@ -1810,14 +1813,16 @@ async def upgrade_message_router(message: Message):
                 bot_sessions.pop(uid,None); return
             try:
                 await approve_withdrawal(result['id'])
-                payout=await create_withdrawal_payout(uid, amount, f"withdrawal-{result['id']}")
+                processing = start_withdrawal_processing(result["id"])
+                if not processing:
+                    raise RuntimeError("Withdrawal is already being processed or has changed state")
+                payout=await create_withdrawal_payout(uid, amount, processing["spend_id"])
                 complete_withdrawal(result['id'])
                 log_event(uid,"withdrawal_paid",f"id={result['id']} amount_usd={amount:.2f} crypto_transfer={payout}")
                 await message.answer(f"💸 Вывод <b>${amount:.2f}</b> отправлен через CryptoBot.")
             except Exception as exc:
-                reject_withdrawal(result['id'])
-                log_event(uid,"withdrawal_failed",f"id={result['id']} error={exc}")
-                await message.answer("Не удалось выполнить выплату через CryptoBot. Средства возвращены на баланс.")
+                log_event(uid,"withdrawal_payout_error",f"id={result['id']} spend_id={result.get('spend_id','')} error={exc}")
+                await message.answer("CryptoBot не подтвердил выплату. Заявка сохранена в обработке, средства остаются зарезервированными до безопасной сверки.")
             bot_sessions.pop(uid,None); return
 
     if session and session.get("step") in {"slot_amount","mines_amount","dice_amount"}:

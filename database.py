@@ -48,6 +48,8 @@ def _is_pg() -> bool:
 
 
 def init_db() -> None:
+    if os.getenv("REAL_ECONOMY", "true").lower() == "true" and not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL is required when REAL_ECONOMY=true; SQLite fallback is disabled in production")
     if not _is_pg():
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with _LOCK, _sqlite_conn() as c:
@@ -113,6 +115,9 @@ def init_db() -> None:
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
+        ALTER TABLE bot_withdrawals ADD COLUMN IF NOT EXISTS spend_id TEXT;
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_bot_withdrawals_spend_id
+            ON bot_withdrawals(spend_id) WHERE spend_id IS NOT NULL;
         CREATE INDEX IF NOT EXISTS idx_bot_withdrawals_status ON bot_withdrawals(status, id);
         CREATE TABLE IF NOT EXISTS bot_settings (
             key TEXT PRIMARY KEY,
@@ -285,32 +290,55 @@ def mark_payment_paid(invoice_id:int)->Optional[dict]:
 
 
 def create_withdrawal(user_id:int, amount_usd:float, payout_details:str):
+    import uuid
     amount_usd=round(float(amount_usd), 2)
-    if amount_usd < float(os.getenv("MIN_WITHDRAW_USD", "1.00")) or not str(payout_details).strip(): return None
-    if not subtract_balance(user_id, amount_usd, 'withdrawal_reserve'): return None
+    if amount_usd < float(os.getenv("MIN_WITHDRAW_USD", "1.00")) or not str(payout_details).strip():
+        return None
+    spend_id = f"wd-{uuid.uuid4().hex}"
     if _is_pg():
         with _LOCK, _pg_conn() as c:
             uid=_pg_user_id(c,user_id)
-            row=c.execute('INSERT INTO bot_withdrawals(user_id,amount_usd,payout_details,status) VALUES (%s,%s,%s,%s) RETURNING id,user_id,amount_usd,payout_details,status,EXTRACT(EPOCH FROM created_at)::bigint AS created_at,EXTRACT(EPOCH FROM updated_at)::bigint AS updated_at',(uid,amount_usd,payout_details.strip(),'pending')).fetchone(); return dict(row)
+            c.execute('SELECT id FROM "User" WHERE id=%s FOR UPDATE', (uid,))
+            row=c.execute('SELECT COALESCE(SUM("amount"),0) AS balance FROM "LedgerEntry" WHERE "userId"=%s',(uid,)).fetchone()
+            current=Decimal(str(row['balance'] or '0')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            amount_d=Decimal(str(amount_usd)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            if current < amount_d:
+                return None
+            c.execute('INSERT INTO "LedgerEntry" ("userId","amount","reason") VALUES (%s,%s,%s)',
+                      (uid,format(-amount_d,'f'),'withdrawal_reserve'))
+            row=c.execute(
+                '''INSERT INTO bot_withdrawals
+                   (user_id,amount_usd,payout_details,status,spend_id)
+                   VALUES (%s,%s,%s,%s,%s)
+                   RETURNING id,user_id,amount_usd,payout_details,status,spend_id,
+                             EXTRACT(EPOCH FROM created_at)::bigint AS created_at,
+                             EXTRACT(EPOCH FROM updated_at)::bigint AS updated_at''',
+                (uid,amount_usd,payout_details.strip(),'pending',spend_id)
+            ).fetchone()
+            return dict(row)
+    if not subtract_balance(user_id, amount_usd, 'withdrawal_reserve'):
+        return None
     with _LOCK, _sqlite_conn() as c:
-        now=int(time.time()); cur=c.execute('INSERT INTO withdrawals(user_id,amount_usd,payout_details,status,created_at,updated_at) VALUES (?,?,?,?,?,?)',(int(user_id),amount_usd,payout_details.strip(),'pending',now,now)); return dict(c.execute('SELECT * FROM withdrawals WHERE id=?',(cur.lastrowid,)).fetchone())
-
+        now=int(time.time())
+        cur=c.execute('INSERT INTO withdrawals(user_id,amount_usd,payout_details,status,created_at,updated_at) VALUES (?,?,?,?,?,?)',
+                      (int(user_id),amount_usd,payout_details.strip(),'pending',now,now))
+        return dict(c.execute('SELECT *, ? AS spend_id FROM withdrawals WHERE id=?',(spend_id,cur.lastrowid)).fetchone())
 
 def get_withdrawal(withdrawal_id:int):
     if _is_pg():
-        rows=_rows_pg('SELECT id,user_id,amount_usd,payout_details,status,EXTRACT(EPOCH FROM created_at)::bigint AS created_at,EXTRACT(EPOCH FROM updated_at)::bigint AS updated_at FROM bot_withdrawals WHERE id=%s',(withdrawal_id,)); return rows[0] if rows else None
+        rows=_rows_pg('SELECT id,user_id,amount_usd,payout_details,status,spend_id,EXTRACT(EPOCH FROM created_at)::bigint AS created_at,EXTRACT(EPOCH FROM updated_at)::bigint AS updated_at FROM bot_withdrawals WHERE id=%s',(withdrawal_id,)); return rows[0] if rows else None
     with _LOCK,_sqlite_conn() as c: row=c.execute('SELECT * FROM withdrawals WHERE id=?',(withdrawal_id,)).fetchone(); return dict(row) if row else None
 
 
 def get_pending_withdrawals(limit:int=20):
-    if _is_pg(): return _rows_pg('SELECT w.id,u."telegramId" AS user_id,u.username,w.amount_usd,w.payout_details,w.status,EXTRACT(EPOCH FROM w.created_at)::bigint AS created_at FROM bot_withdrawals w JOIN "User" u ON u.id=w.user_id WHERE w.status=\'pending\' ORDER BY w.id ASC LIMIT %s',(limit,))
+    if _is_pg(): return _rows_pg('SELECT w.id,u."telegramId" AS user_id,u.username,w.amount_usd,w.payout_details,w.status,w.spend_id,EXTRACT(EPOCH FROM w.created_at)::bigint AS created_at FROM bot_withdrawals w JOIN "User" u ON u.id=w.user_id WHERE w.status=\'pending\' ORDER BY w.id ASC LIMIT %s',(limit,))
     with _LOCK,_sqlite_conn() as c:return [dict(r) for r in c.execute("SELECT * FROM withdrawals WHERE status='pending' ORDER BY id ASC LIMIT ?",(limit,)).fetchall()]
 
 
 def get_withdrawal_history(user_id:int, limit:int=20):
     if _is_pg():
         with _LOCK,_pg_conn() as c:
-            uid=_pg_user_id(c,user_id); return [dict(r) for r in c.execute('SELECT id,%s::bigint AS user_id,amount_usd,payout_details,status,EXTRACT(EPOCH FROM created_at)::bigint AS created_at,EXTRACT(EPOCH FROM updated_at)::bigint AS updated_at FROM bot_withdrawals WHERE user_id=%s ORDER BY id DESC LIMIT %s',(int(user_id),uid,limit)).fetchall()]
+            uid=_pg_user_id(c,user_id); return [dict(r) for r in c.execute('SELECT id,%s::bigint AS user_id,amount_usd,payout_details,status,spend_id,EXTRACT(EPOCH FROM created_at)::bigint AS created_at,EXTRACT(EPOCH FROM updated_at)::bigint AS updated_at FROM bot_withdrawals WHERE user_id=%s ORDER BY id DESC LIMIT %s',(int(user_id),uid,limit)).fetchall()]
     with _LOCK,_sqlite_conn() as c:return [dict(r) for r in c.execute('SELECT * FROM withdrawals WHERE user_id=? ORDER BY id DESC LIMIT ?',(int(user_id),limit)).fetchall()]
 
 
@@ -335,12 +363,24 @@ def reject_withdrawal(withdrawal_id:int):
         now=int(time.time()); c.execute("UPDATE withdrawals SET status='rejected',updated_at=? WHERE id=?",(now,withdrawal_id)); return get_withdrawal(withdrawal_id)
 
 
+def start_withdrawal_processing(withdrawal_id:int):
+    if _is_pg():
+        with _LOCK,_pg_conn() as c:
+            row=c.execute("UPDATE bot_withdrawals SET status='processing',updated_at=NOW() WHERE id=%s AND status='approved' RETURNING *",(withdrawal_id,)).fetchone()
+            return dict(row) if row else None
+    with _LOCK,_sqlite_conn() as c:
+        now=int(time.time())
+        cur=c.execute("UPDATE withdrawals SET status='processing',updated_at=? WHERE id=? AND status='approved'",(now,withdrawal_id))
+        row=c.execute('SELECT * FROM withdrawals WHERE id=?',(withdrawal_id,)).fetchone()
+        return dict(row) if cur.rowcount else None
+
+
 def complete_withdrawal(withdrawal_id:int):
     if _is_pg():
         with _LOCK,_pg_conn() as c:
             row=c.execute("UPDATE bot_withdrawals SET status='paid',updated_at=NOW() WHERE id=%s AND status='approved' RETURNING *",(withdrawal_id,)).fetchone(); return dict(row) if row else None
     with _LOCK,_sqlite_conn() as c:
-        now=int(time.time()); cur=c.execute("UPDATE withdrawals SET status='paid',updated_at=? WHERE id=? AND status='approved'",(now,withdrawal_id)); row=c.execute('SELECT * FROM withdrawals WHERE id=?',(withdrawal_id,)).fetchone(); return dict(row) if cur.rowcount else None
+        now=int(time.time()); cur=c.execute("UPDATE withdrawals SET status='paid',updated_at=? WHERE id=? AND status='processing'",(now,withdrawal_id)); row=c.execute('SELECT * FROM withdrawals WHERE id=?',(withdrawal_id,)).fetchone(); return dict(row) if cur.rowcount else None
 
 
 def log_event(user_id:int|None, action:str, details:str='')->None:
