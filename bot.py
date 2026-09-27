@@ -112,6 +112,14 @@ RNG = random.SystemRandom()
 UPGRADE_HOUSE_EDGE = float(os.getenv("UPGRADE_HOUSE_EDGE", "0.04"))
 UPGRADE_GIF = Path(os.getenv("UPGRADE_GIF", str(ROOT_DIR / "upgrader_spin.gif")))
 START_IMAGE = Path(os.getenv("START_IMAGE", str(ROOT_DIR / "start.jpg")))
+PLAY_AND_WIN_IMAGE = Path(os.getenv("PLAY_AND_WIN_IMAGE", str(ROOT_DIR / "play_and_win.jpg")))
+WALLET_IMAGE = Path(os.getenv("WALLET_IMAGE", str(ROOT_DIR / "wallet.jpg")))
+PROFILE_IMAGE = Path(os.getenv("PROFILE_IMAGE", str(ROOT_DIR / "profile.jpg")))
+
+# Telegram Premium custom emoji used as native button icons.
+PLAY_AND_WIN_BUTTON_EMOJI_ID = "5188344996356448758"
+WALLET_BUTTON_EMOJI_ID = "4965219701572503640"
+PROFILE_BUTTON_EMOJI_ID = "5019726470101075726"
 HELP_USERNAME = os.getenv("HELP_USERNAME", "narotan7").lstrip("@")
 # Premium custom emoji used as the currency/amount marker in bot messages.
 M = "₽"
@@ -842,8 +850,11 @@ def _menu_keyboard(user_id: int):
 
 def _bottom_keyboard(user_id: int):
     rows = [
-            [KeyboardButton(text="🤡 Play & Win")],
-            [KeyboardButton(text="🧳 Кошелёк"), KeyboardButton(text="💵 Профиль")],
+        [KeyboardButton(text="Play and Win", icon_custom_emoji_id=PLAY_AND_WIN_BUTTON_EMOJI_ID, style="primary")],
+        [
+            KeyboardButton(text="Кошелёк", icon_custom_emoji_id=WALLET_BUTTON_EMOJI_ID, style="primary"),
+            KeyboardButton(text="Профиль", icon_custom_emoji_id=PROFILE_BUTTON_EMOJI_ID, style="primary"),
+        ],
     ]
     if is_admin(user_id):
         rows.append([KeyboardButton(text="⚙️ Админ панель")])
@@ -872,17 +883,22 @@ def _wallet_keyboard():
          InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:home")],
     ])
 
-def _games_keyboard():
-    # Telegram bot mirrors the supplied reference: games live in the bot,
-    # while the Mini App button is intentionally not shown here.
+def _play_and_win_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💣 Mines", callback_data="refgame:mines"), InlineKeyboardButton(text="🗼 Tower", callback_data="refgame:tower"), InlineKeyboardButton(text="✊ КНБ", callback_data="refgame:knb")],
-        [InlineKeyboardButton(text="🔢 Keno", callback_data="refgame:keno"), InlineKeyboardButton(text="🔻 Plinko", callback_data="refgame:plinko"), InlineKeyboardButton(text="⚖️ Even", callback_data="refgame:even")],
-        [InlineKeyboardButton(text="🎡 Сектор", callback_data="refgame:sector"), InlineKeyboardButton(text="⚔️ Дуэль", callback_data="refgame:duel")],
-        [InlineKeyboardButton(text="↕️ Больше-Меньше", callback_data="refgame:higher_lower")],
-        [InlineKeyboardButton(text="🏹 Hi-Lo", callback_data="refgame:hilo"), InlineKeyboardButton(text="🥅 Пенальти", callback_data="refgame:penalty")],
-        [InlineKeyboardButton(text="🃏 Blackjack", callback_data="refgame:blackjack"), InlineKeyboardButton(text="🃏 Baccarat", callback_data="refgame:baccarat")],
-        [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:home")],
+        [InlineKeyboardButton(text="Играть в приложении", web_app=WebAppInfo(url=WEBAPP_URL), style="primary")],
+        [InlineKeyboardButton(text="Играть в боте", callback_data="play:bot", style="primary")],
+        [InlineKeyboardButton(text="Игровой чат", url="https://t.me/+_2fw879xF8YxYjEy", style="primary")],
+    ])
+
+def _games_keyboard():
+    primary = "primary"
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💣 Mines", callback_data="refgame:mines", style=primary), InlineKeyboardButton(text="🗼 Tower", callback_data="refgame:tower", style=primary), InlineKeyboardButton(text="✊ КНБ", callback_data="refgame:knb", style=primary)],
+        [InlineKeyboardButton(text="🔢 Кено", callback_data="refgame:keno", style=primary), InlineKeyboardButton(text="🔻 Plinko", callback_data="refgame:plinko", style=primary), InlineKeyboardButton(text="⚖️ Even", callback_data="refgame:even", style=primary)],
+        [InlineKeyboardButton(text="🎡 Сектор", callback_data="refgame:sector", style=primary), InlineKeyboardButton(text="⚔️ Дуэль", callback_data="refgame:duel", style=primary)],
+        [InlineKeyboardButton(text="↕️ Больше-Меньше", callback_data="refgame:higher_lower", style=primary)],
+        [InlineKeyboardButton(text="🃏 Hi-lo", callback_data="refgame:hilo", style=primary), InlineKeyboardButton(text="🥅 Пенальти", callback_data="refgame:penalty", style=primary)],
+        [InlineKeyboardButton(text="⬅️ Play and Win", callback_data="play:home", style=primary)],
     ])
 
 async def _edit_menu(callback: CallbackQuery, text: str, markup: InlineKeyboardMarkup):
@@ -927,21 +943,25 @@ def _wallet_text(uid: int) -> str:
     ).replace(",", " ")
 
 def _games_text() -> str:
-    return ("╭────────────────────╮\n       🎮 | PLAY & WIN\n╰────────────────────╯\n\n"
-            "🎯 Игра с Telegram Emojis — бросает бот\n\n"
-            "💣 Mines — открывайте безопасные клетки\n"
-            "🗼 Tower — поднимайтесь по этажам\n"
-            "✊ КНБ — камень, ножницы, бумага\n"
-            "🔢 Keno — выбирайте числа\n"
-            "🔻 Plinko — больше значение → больше коэффициент\n"
-            "⚖️ Even — чётное или нечётное\n"
-            "🎡 Сектор — три сектора по два исхода\n"
-            "⚔️ Дуэль — выбор стороны\n"
-            "↕️ Больше-Меньше — угадайте направление\n"
-            "🏹 Hi-Lo — угадайте следующую карту\n"
-            "🥅 Пенальти — забейте гол\n"
-            "🃏 Blackjack / Baccarat — карточные игры\n\n"
-            "Выберите игру:")
+    return (
+        "🤑 <b>Resonant Original's</b>\n\n"
+        "🎮 Авторские мини-игры против заведения\n"
+        "💣 Mines — открывайте клетки, забирайте до взрыва.\n"
+        "🗼 Tower — поднимайтесь по башне, не наступите на бомбу.\n"
+        "✊ КНБ — камень, ножницы, бумага: бросок против бота.\n"
+        "🔢 Кено — отметьте 4 числа из 20, тираж вытянет 6.\n"
+        "🃏 Blackjack — наберите ближе к 21, чем дилер.\n"
+        "🎴 Baccara — Игрок, Банкир или Ничья: ближе к 9 — сильнее. При ничьей ставка на Игрока или Банкира возвращается.\n"
+        "🎲 Игра с Telegram Emojis — бросает бот.\n"
+        "🔻 Plinko — больше выпавшее значение — больше коэффициент.\n"
+        "⚖️ Even — чётное или нечётное выпавшее значение.\n"
+        "🎡 Сектор — три сектора по два числа на выпавшем значении.\n"
+        "⚔️ Дуэль — ваш кубик против кубика бота.\n"
+        "🥅 Пенальти — бейте по воротам, забирайте до промаха.\n\n"
+        "Выберите игру:")
+
+def _play_and_win_text() -> str:
+    return "🤑 <b>Resonant Original's</b>\n\n🎮 Авторские мини-игры против заведения\n\nВыберите, где хотите играть:"
 
 @dp.message(CommandStart())
 async def start_handler(message: Message):
@@ -987,6 +1007,15 @@ async def subscription_check(callback: CallbackQuery):
         if callback.message:
             await callback.message.answer(_subscription_error_text(), reply_markup=_subscription_keyboard())
 
+
+@dp.callback_query(lambda c: c.data and c.data.startswith("play:"))
+async def play_callbacks(callback: CallbackQuery):
+    action = callback.data.split(":", 1)[1]
+    if action == "home":
+        await _edit_menu(callback, _play_and_win_text(), _play_and_win_keyboard())
+    elif action == "bot":
+        await _edit_menu(callback, _games_text(), _games_keyboard())
+    await callback.answer()
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("menu:"))
 async def menu_callbacks(callback: CallbackQuery):
@@ -1489,20 +1518,32 @@ async def admin_command(message: Message):
         [InlineKeyboardButton(text="💳 Пополнения",callback_data="admin:payments"), InlineKeyboardButton(text="💸 Выводы",callback_data="admin:withdrawals")],
     ]))
 
+async def _send_section_photo(message: Message, image_path: Path, caption: str, reply_markup):
+    """Send a section hero image with its normal section controls."""
+    if image_path.exists():
+        await message.answer_photo(
+            FSInputFile(image_path),
+            caption=caption,
+            reply_markup=reply_markup,
+        )
+    else:
+        await message.answer(caption, reply_markup=reply_markup)
+
+
 @dp.message()
 async def upgrade_message_router(message: Message):
     if not message.from_user: return
     uid=message.from_user.id
     session=bot_sessions.get(uid)
     text=str(message.text or '').strip()
-    if text in {"🤡 Play & Win", "Play & Win"}:
-        await message.answer(_games_text(), reply_markup=_games_keyboard())
+    if text in {"Play and Win", "🎮 Play and Win", "🤡 Play & Win", "Play & Win"}:
+        await _send_section_photo(message, PLAY_AND_WIN_IMAGE, _play_and_win_text(), _play_and_win_keyboard())
         return
-    if text in {"🧳 Кошелёк", "Кошелёк", "💰 Кошелек", "Кошелек"}:
-        await message.answer(_wallet_text(uid), reply_markup=_wallet_keyboard())
+    if text in {"Кошелёк", "🧳 Кошелёк", "💰 Кошелек", "Кошелек"}:
+        await _send_section_photo(message, WALLET_IMAGE, _wallet_text(uid), _wallet_keyboard())
         return
-    if text in {"💵 Профиль", "Профиль"}:
-        await message.answer(_profile_text(uid), reply_markup=_profile_keyboard(uid))
+    if text in {"Профиль", "💵 Профиль"}:
+        await _send_section_photo(message, PROFILE_IMAGE, _profile_text(uid), _profile_keyboard(uid))
         return
     if text in {"⚙️ Админ панель", "Админ панель", "ADMIN PANEL"}:
         if not is_admin(uid):
