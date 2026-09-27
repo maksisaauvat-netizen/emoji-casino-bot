@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, BaseMiddleware
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
@@ -38,6 +38,8 @@ WEBAPP_URL = os.getenv("WEBAPP_URL", BASE_URL)
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", secrets.token_urlsafe(24))
 WEBAPP_AUTH_MAX_AGE = int(os.getenv("WEBAPP_AUTH_MAX_AGE", "86400"))
 REAL_ECONOMY = os.getenv("REAL_ECONOMY", "false").lower() == "true"
+REQUIRED_CHANNEL = os.getenv("REQUIRED_CHANNEL", "@resonant_casino")
+REQUIRED_CHANNEL_URL = os.getenv("REQUIRED_CHANNEL_URL", "https://t.me/resonant_casino")
 WEBHOOK_PATH = f"/webhook/{WEBHOOK_SECRET}"
 
 if not BOT_TOKEN:
@@ -742,6 +744,71 @@ async def withdraw(p: Withdraw):
     return {"withdrawal":result,"balance":bal(uid)}
 
 
+
+def _subscription_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📢 Подписаться на канал", url=REQUIRED_CHANNEL_URL)],
+        [InlineKeyboardButton(text="✅ Проверить подписку", callback_data="subscription:check")],
+    ])
+
+
+def _subscription_text() -> str:
+    return (
+        "🔒 <b>Доступ к Resonant Casino</b>\n\n"
+        "Перед началом работы необходимо подписаться на наш канал:\n"
+        "📢 <b>@resonant_casino</b>\n\n"
+        "1. Нажмите «Подписаться на канал».\n"
+        "2. Вернитесь в бота.\n"
+        "3. Нажмите «Проверить подписку»."
+    )
+
+
+async def _is_channel_subscribed(user_id: int) -> bool:
+    try:
+        member = await bot.get_chat_member(chat_id=REQUIRED_CHANNEL, user_id=user_id)
+        status = getattr(member, "status", None)
+        if status in {"member", "administrator", "creator"}:
+            return True
+        if status == "restricted":
+            return bool(getattr(member, "is_member", False))
+        return False
+    except Exception as exc:
+        logger.warning("Subscription check failed for %s in %s: %s", user_id, REQUIRED_CHANNEL, exc)
+        return False
+
+
+class SubscriptionMiddleware(BaseMiddleware):
+    async def __call__(self, handler, event, data):
+        user = getattr(event, "from_user", None)
+        if not user:
+            return await handler(event, data)
+
+        # The start command and the subscription-check callback are the only
+        # actions available before the required channel subscription is verified.
+        if isinstance(event, Message):
+            text = str(event.text or "").strip()
+            if text.startswith("/start"):
+                return await handler(event, data)
+        if isinstance(event, CallbackQuery):
+            callback_data = str(event.data or "")
+            if callback_data == "subscription:check":
+                return await handler(event, data)
+
+        if await _is_channel_subscribed(user.id):
+            return await handler(event, data)
+
+        if isinstance(event, CallbackQuery):
+            await event.answer("Сначала подпишитесь на канал", show_alert=True)
+            if event.message:
+                await event.message.answer(_subscription_text(), reply_markup=_subscription_keyboard())
+        elif isinstance(event, Message):
+            await event.answer(_subscription_text(), reply_markup=_subscription_keyboard())
+        return None
+
+
+dp.message.outer_middleware(SubscriptionMiddleware())
+dp.callback_query.outer_middleware(SubscriptionMiddleware())
+
 def _menu_keyboard(user_id: int):
     rows = [
         [InlineKeyboardButton(text="👤 Профиль", callback_data="menu:profile")],
@@ -750,14 +817,19 @@ def _menu_keyboard(user_id: int):
         [InlineKeyboardButton(text="🎮 Играть", callback_data="menu:games")],
         [InlineKeyboardButton(text="🆘 Помощь", url=f"https://t.me/{HELP_USERNAME}")],
     ]
+    if is_admin(user_id):
+        rows.insert(-1, [InlineKeyboardButton(text="⚙️ Админ панель", callback_data="admin:home")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
-def _bottom_keyboard():
-    return ReplyKeyboardMarkup(
-        keyboard=[
+def _bottom_keyboard(user_id: int):
+    rows = [
             [KeyboardButton(text="🤡 Play & Win")],
             [KeyboardButton(text="🧳 Кошелёк"), KeyboardButton(text="💵 Профиль")],
-        ],
+    ]
+    if is_admin(user_id):
+        rows.append([KeyboardButton(text="⚙️ Админ панель")])
+    return ReplyKeyboardMarkup(
+        keyboard=rows,
         resize_keyboard=True,
         is_persistent=True,
     )
@@ -856,6 +928,9 @@ def _games_text() -> str:
 async def start_handler(message: Message):
     if not message.from_user: return
     uid=message.from_user.id
+    if not await _is_channel_subscribed(uid):
+        await message.answer(_subscription_text(), reply_markup=_subscription_keyboard())
+        return
     sync_profile(uid, message.from_user.username); log_event(uid, "bot_start")
     caption=(
         "╔══════════════════════╗\n"
@@ -865,10 +940,32 @@ async def start_handler(message: Message):
     )
     if START_IMAGE.exists():
         await message.answer_photo(FSInputFile(START_IMAGE), caption=caption, reply_markup=_menu_keyboard(uid))
-        await message.answer("Выберите раздел:", reply_markup=_bottom_keyboard())
+        await message.answer("Выберите раздел:", reply_markup=_bottom_keyboard(uid))
     else:
         await message.answer(caption, reply_markup=_menu_keyboard(uid))
-        await message.answer("Выберите раздел:", reply_markup=_bottom_keyboard())
+        await message.answer("Выберите раздел:", reply_markup=_bottom_keyboard(uid))
+
+@dp.callback_query(lambda c: c.data == "subscription:check")
+async def subscription_check(callback: CallbackQuery):
+    uid = callback.from_user.id
+    if await _is_channel_subscribed(uid):
+        sync_profile(uid, callback.from_user.username)
+        await callback.answer("Подписка подтверждена ✅")
+        caption = (
+            "╔══════════════════════╗\n"
+            "      🎰 RESONANT\n"
+            "        CASINO\n"
+            "╚══════════════════════╝"
+        )
+        if START_IMAGE.exists():
+            await callback.message.answer_photo(FSInputFile(START_IMAGE), caption=caption, reply_markup=_menu_keyboard(uid))
+            await callback.message.answer("Выберите раздел:", reply_markup=_bottom_keyboard(uid))
+        else:
+            await callback.message.answer(caption, reply_markup=_menu_keyboard(uid))
+            await callback.message.answer("Выберите раздел:", reply_markup=_bottom_keyboard(uid))
+    else:
+        await callback.answer("Подписка не найдена. Подпишитесь на канал и нажмите «Проверить» ещё раз.", show_alert=True)
+
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("menu:"))
 async def menu_callbacks(callback: CallbackQuery):
@@ -1359,6 +1456,18 @@ async def upgrade_command(message: Message):
     upgrade_sessions[uid]={"step":"amount"}
     await message.answer("⚡ <b>UPGRADER</b>\n\nОтправьте сумму ставки одним сообщением.\nНапример: <b>100</b>")
 
+@dp.message(Command("admin"))
+async def admin_command(message: Message):
+    if not message.from_user or not is_admin(message.from_user.id):
+        await message.answer("Доступ запрещен.")
+        return
+    await message.answer("🛠 <b>ADMIN PANEL</b>\n\nВыберите раздел:", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👥 Пользователи",callback_data="admin:users"), InlineKeyboardButton(text="📊 Активность",callback_data="admin:activity")],
+        [InlineKeyboardButton(text="💰 Изменить баланс",callback_data="admin:adjust")],
+        [InlineKeyboardButton(text="📝 Логи",callback_data="admin:logs")],
+        [InlineKeyboardButton(text="💳 Пополнения",callback_data="admin:payments"), InlineKeyboardButton(text="💸 Выводы",callback_data="admin:withdrawals")],
+    ]))
+
 @dp.message()
 async def upgrade_message_router(message: Message):
     if not message.from_user: return
@@ -1373,6 +1482,17 @@ async def upgrade_message_router(message: Message):
         return
     if text in {"💵 Профиль", "Профиль"}:
         await message.answer(_profile_text(uid), reply_markup=_profile_keyboard(uid))
+        return
+    if text in {"⚙️ Админ панель", "Админ панель", "ADMIN PANEL"}:
+        if not is_admin(uid):
+            await message.answer("Доступ запрещен.")
+            return
+        await message.answer("🛠 <b>ADMIN PANEL</b>\n\nВыберите раздел:", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="👥 Пользователи",callback_data="admin:users"), InlineKeyboardButton(text="📊 Активность",callback_data="admin:activity")],
+            [InlineKeyboardButton(text="💰 Изменить баланс",callback_data="admin:adjust")],
+            [InlineKeyboardButton(text="📝 Логи",callback_data="admin:logs")],
+            [InlineKeyboardButton(text="💳 Пополнения",callback_data="admin:payments"), InlineKeyboardButton(text="💸 Выводы",callback_data="admin:withdrawals")],
+        ]))
         return
     if session:
         if session.get("step")=="deposit_amount":
