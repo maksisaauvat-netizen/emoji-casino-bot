@@ -117,9 +117,26 @@ WALLET_IMAGE = Path(os.getenv("WALLET_IMAGE", str(ROOT_DIR / "wallet.jpg")))
 PROFILE_IMAGE = Path(os.getenv("PROFILE_IMAGE", str(ROOT_DIR / "profile.jpg")))
 
 # Telegram Premium custom emoji used as native button icons.
-PLAY_AND_WIN_BUTTON_EMOJI_ID = "5188344996356448758"
+PLAY_AND_WIN_BUTTON_EMOJI_ID = "5438615665567084768"
 WALLET_BUTTON_EMOJI_ID = "4965219701572503640"
 PROFILE_BUTTON_EMOJI_ID = "5019726470101075726"
+MINES_BUTTON_EMOJI_ID = "5280569974404966639"
+EVEN_BUTTON_EMOJI_ID = "5400250414929041085"
+SECTOR_BUTTON_EMOJI_ID = "5226711870492126219"
+DUEL_BUTTON_EMOJI_ID = "6334472841953544334"
+HILO_BUTTON_EMOJI_ID = "5298499667569425533"
+PLAY_APP_BUTTON_EMOJI_ID = "5438615665567084768"
+PLAY_BOT_BUTTON_EMOJI_ID = "5384509325429463744"
+GAME_CHAT_BUTTON_EMOJI_ID = "5427244958694285890"
+SUBSCRIBE_BUTTON_EMOJI_ID = "5278256077954105203"
+CHECK_SUBSCRIPTION_BUTTON_EMOJI_ID = "5350722806281676158"
+BACK_BUTTON_EMOJI_ID = "5994442901059276913"
+DEPOSIT_BUTTON_EMOJI_ID = "5449624985301717991"
+WITHDRAW_BUTTON_EMOJI_ID = "5197434882321567830"
+HISTORY_BUTTON_EMOJI_ID = "5857306747076611982"
+SETTINGS_BUTTON_EMOJI_ID = "5341715473882955310"
+USERS_BUTTON_EMOJI_ID = "5303328645329209869"
+ADMIN_BUTTON_EMOJI_ID = "5462921117423384478"
 HELP_USERNAME = os.getenv("HELP_USERNAME", "narotan7").lstrip("@")
 # Premium custom emoji used as the currency/amount marker in bot messages.
 M = "₽"
@@ -758,8 +775,8 @@ async def withdraw(p: Withdraw):
 
 def _subscription_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📢 Подписаться на канал", url=REQUIRED_CHANNEL_URL)],
-        [InlineKeyboardButton(text="✅ Проверить подписку", callback_data="subscription:check")],
+        [InlineKeyboardButton(text="Подписаться на канал", url=REQUIRED_CHANNEL_URL, icon_custom_emoji_id=SUBSCRIBE_BUTTON_EMOJI_ID)],
+        [InlineKeyboardButton(text="Проверить подписку", callback_data="subscription:check", icon_custom_emoji_id=CHECK_SUBSCRIPTION_BUTTON_EMOJI_ID)],
     ])
 
 
@@ -838,14 +855,14 @@ dp.callback_query.outer_middleware(SubscriptionMiddleware())
 
 def _menu_keyboard(user_id: int):
     rows = [
-        [InlineKeyboardButton(text="👤 Профиль", callback_data="menu:profile")],
-        [InlineKeyboardButton(text="💰 Кошелек", callback_data="menu:wallet"),
+        [InlineKeyboardButton(text="Профиль", callback_data="menu:profile", icon_custom_emoji_id=PROFILE_BUTTON_EMOJI_ID)],
+        [InlineKeyboardButton(text="Кошелек", callback_data="menu:wallet", icon_custom_emoji_id=WALLET_BUTTON_EMOJI_ID),
          InlineKeyboardButton(text="🎁 Бонусы", callback_data="menu:bonuses")],
         [InlineKeyboardButton(text="🎮 Играть", callback_data="menu:games")],
         [InlineKeyboardButton(text="🆘 Помощь", url=f"https://t.me/{HELP_USERNAME}")],
     ]
     if is_admin(user_id):
-        rows.insert(-1, [InlineKeyboardButton(text="⚙️ Админ панель", callback_data="admin:home")])
+        rows.insert(-1, [InlineKeyboardButton(text="Админ панель", callback_data="admin:home", icon_custom_emoji_id=ADMIN_BUTTON_EMOJI_ID)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 def _bottom_keyboard(user_id: int):
@@ -857,7 +874,7 @@ def _bottom_keyboard(user_id: int):
         ],
     ]
     if is_admin(user_id):
-        rows.append([KeyboardButton(text="⚙️ Админ панель")])
+        rows.append([KeyboardButton(text="Админ панель", icon_custom_emoji_id=ADMIN_BUTTON_EMOJI_ID, style="primary")])
     return ReplyKeyboardMarkup(
         keyboard=rows,
         resize_keyboard=True,
@@ -871,34 +888,34 @@ def _profile_keyboard(user_id: int):
     ]
     if is_admin(user_id):
         rows.append([InlineKeyboardButton(text="ADMIN PANEL", callback_data="admin:home")])
-    rows.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:home")])
+    rows.append([InlineKeyboardButton(text="Назад", callback_data="menu:home", icon_custom_emoji_id=BACK_BUTTON_EMOJI_ID)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 def _wallet_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Пополнить", callback_data="wallet:deposit"),
-         InlineKeyboardButton(text="Вывод", callback_data="wallet:withdraw")],
-        [InlineKeyboardButton(text="История", callback_data="wallet:history")],
+        [InlineKeyboardButton(text="Пополнить", callback_data="wallet:deposit", icon_custom_emoji_id=DEPOSIT_BUTTON_EMOJI_ID),
+         InlineKeyboardButton(text="Вывод", callback_data="wallet:withdraw", icon_custom_emoji_id=WITHDRAW_BUTTON_EMOJI_ID)],
+        [InlineKeyboardButton(text="История", callback_data="wallet:history", icon_custom_emoji_id=HISTORY_BUTTON_EMOJI_ID)],
         [InlineKeyboardButton(text="🎮 Играть", callback_data="menu:games"),
-         InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:home")],
+         InlineKeyboardButton(text="Назад", callback_data="menu:home", icon_custom_emoji_id=BACK_BUTTON_EMOJI_ID)],
     ])
 
 def _play_and_win_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Играть в приложении", web_app=WebAppInfo(url=WEBAPP_URL), style="primary")],
-        [InlineKeyboardButton(text="Играть в боте", callback_data="play:bot", style="primary")],
-        [InlineKeyboardButton(text="Игровой чат", url="https://t.me/+_2fw879xF8YxYjEy", style="primary")],
+        [InlineKeyboardButton(text="Играть в приложении", web_app=WebAppInfo(url=WEBAPP_URL), style="primary", icon_custom_emoji_id=PLAY_APP_BUTTON_EMOJI_ID)],
+        [InlineKeyboardButton(text="Играть в боте", callback_data="play:bot", style="primary", icon_custom_emoji_id=PLAY_BOT_BUTTON_EMOJI_ID)],
+        [InlineKeyboardButton(text="Игровой чат", url="https://t.me/+_2fw879xF8YxYjEy", style="primary", icon_custom_emoji_id=GAME_CHAT_BUTTON_EMOJI_ID)],
     ])
 
 def _games_keyboard():
     primary = "primary"
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💣 Mines", callback_data="refgame:mines", style=primary), InlineKeyboardButton(text="🗼 Tower", callback_data="refgame:tower", style=primary), InlineKeyboardButton(text="✊ КНБ", callback_data="refgame:knb", style=primary)],
-        [InlineKeyboardButton(text="🔢 Кено", callback_data="refgame:keno", style=primary), InlineKeyboardButton(text="🔻 Plinko", callback_data="refgame:plinko", style=primary), InlineKeyboardButton(text="⚖️ Even", callback_data="refgame:even", style=primary)],
-        [InlineKeyboardButton(text="🎡 Сектор", callback_data="refgame:sector", style=primary), InlineKeyboardButton(text="⚔️ Дуэль", callback_data="refgame:duel", style=primary)],
+        [InlineKeyboardButton(text="Mines", callback_data="refgame:mines", style=primary, icon_custom_emoji_id=MINES_BUTTON_EMOJI_ID), InlineKeyboardButton(text="🗼 Tower", callback_data="refgame:tower", style=primary), InlineKeyboardButton(text="✊ КНБ", callback_data="refgame:knb", style=primary)],
+        [InlineKeyboardButton(text="🔢 Кено", callback_data="refgame:keno", style=primary), InlineKeyboardButton(text="🔻 Plinko", callback_data="refgame:plinko", style=primary), InlineKeyboardButton(text="Even", callback_data="refgame:even", style=primary, icon_custom_emoji_id=EVEN_BUTTON_EMOJI_ID)],
+        [InlineKeyboardButton(text="Сектор", callback_data="refgame:sector", style=primary, icon_custom_emoji_id=SECTOR_BUTTON_EMOJI_ID), InlineKeyboardButton(text="Дуэль", callback_data="refgame:duel", style=primary, icon_custom_emoji_id=DUEL_BUTTON_EMOJI_ID)],
         [InlineKeyboardButton(text="↕️ Больше-Меньше", callback_data="refgame:higher_lower", style=primary)],
-        [InlineKeyboardButton(text="🃏 Hi-lo", callback_data="refgame:hilo", style=primary), InlineKeyboardButton(text="🥅 Пенальти", callback_data="refgame:penalty", style=primary)],
-        [InlineKeyboardButton(text="⬅️ Play and Win", callback_data="play:home", style=primary)],
+        [InlineKeyboardButton(text="Hi-lo", callback_data="refgame:hilo", style=primary, icon_custom_emoji_id=HILO_BUTTON_EMOJI_ID), InlineKeyboardButton(text="🥅 Пенальти", callback_data="refgame:penalty", style=primary)],
+        [InlineKeyboardButton(text="Play and Win", callback_data="play:home", style=primary, icon_custom_emoji_id=PLAY_AND_WIN_BUTTON_EMOJI_ID)],
     ])
 
 async def _edit_menu(callback: CallbackQuery, text: str, markup: InlineKeyboardMarkup):
@@ -1037,7 +1054,7 @@ async def menu_callbacks(callback: CallbackQuery):
             "╭────────────────────╮\n       🎁 | BONUS\n╰────────────────────╯\n\n"
             "Бонусы и реферальная система доступны в приложении.",
             InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu:home")]
+                [InlineKeyboardButton(text="Назад", callback_data="menu:home", icon_custom_emoji_id=BACK_BUTTON_EMOJI_ID)]
             ]))
     elif action=="games":
         await _edit_menu(callback, _games_text(), _games_keyboard())
@@ -1434,8 +1451,8 @@ async def admin_callbacks(callback: CallbackQuery):
               "Панель бота синхронизирована с базой Mini App.\n"
               "Баланс и профили общие для обоих интерфейсов.")
         markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="👥 Пользователи",callback_data="admin:users"), InlineKeyboardButton(text="📊 Активность",callback_data="admin:activity")],
-            [InlineKeyboardButton(text="💰 Изменить баланс",callback_data="admin:adjust")],
+            [InlineKeyboardButton(text="Пользователи",icon_custom_emoji_id=USERS_BUTTON_EMOJI_ID,callback_data="admin:users"), InlineKeyboardButton(text="📊 Активность",callback_data="admin:activity")],
+            [InlineKeyboardButton(text="Изменить баланс",icon_custom_emoji_id=DEPOSIT_BUTTON_EMOJI_ID,callback_data="admin:adjust")],
             [InlineKeyboardButton(text="📝 Логи",callback_data="admin:logs")],
             [InlineKeyboardButton(text="💳 Пополнения",callback_data="admin:payments"), InlineKeyboardButton(text="💸 Выводы",callback_data="admin:withdrawals")],
             [InlineKeyboardButton(text="⬅️ Профиль",callback_data="menu:profile")]
@@ -1463,7 +1480,7 @@ async def admin_callbacks(callback: CallbackQuery):
               f"Игры: {stats['games']} · Победы: {stats['wins']} · Поражения: {stats['losses']}\n"
               f"Winrate: {stats['winrate']}%\nОборот: {stats['turnover']} ₽\nВыиграно: {stats['payouts']} ₽\nMax Win: {stats['max_win']} ₽\n\n"
               "<b>Последние операции</b>\n" + ("\n".join(f"#{e['id']} · {float(e['amount']):+.2f} ₽ · {e['reason']}" for e in entries) or "—"))
-        markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="💰 Изменить баланс",callback_data=f"admin:adjust:{target}")],[InlineKeyboardButton(text="⬅️ Пользователи",callback_data="admin:users")]])
+        markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Изменить баланс",icon_custom_emoji_id=DEPOSIT_BUTTON_EMOJI_ID,callback_data=f"admin:adjust:{target}")],[InlineKeyboardButton(text="⬅️ Пользователи",callback_data="admin:users")]])
     elif action=="activity":
         rows=get_ledger_activity(40)
         text="📊 <b>АКТИВНОСТЬ / LEDGER</b>\n\n"+("\n".join(f"#{r['id']} · {r.get('username') or r['user_id']} · <b>{float(r['amount']):+.2f} ₽</b> · {r['reason']}" for r in rows) or "—")
@@ -1512,8 +1529,8 @@ async def admin_command(message: Message):
         await message.answer("Доступ запрещен.")
         return
     await message.answer("🛠 <b>ADMIN PANEL</b>\n\nВыберите раздел:", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="👥 Пользователи",callback_data="admin:users"), InlineKeyboardButton(text="📊 Активность",callback_data="admin:activity")],
-        [InlineKeyboardButton(text="💰 Изменить баланс",callback_data="admin:adjust")],
+        [InlineKeyboardButton(text="Пользователи",icon_custom_emoji_id=USERS_BUTTON_EMOJI_ID,callback_data="admin:users"), InlineKeyboardButton(text="📊 Активность",callback_data="admin:activity")],
+        [InlineKeyboardButton(text="Изменить баланс",icon_custom_emoji_id=DEPOSIT_BUTTON_EMOJI_ID,callback_data="admin:adjust")],
         [InlineKeyboardButton(text="📝 Логи",callback_data="admin:logs")],
         [InlineKeyboardButton(text="💳 Пополнения",callback_data="admin:payments"), InlineKeyboardButton(text="💸 Выводы",callback_data="admin:withdrawals")],
     ]))
@@ -1550,8 +1567,8 @@ async def upgrade_message_router(message: Message):
             await message.answer("Доступ запрещен.")
             return
         await message.answer("🛠 <b>ADMIN PANEL</b>\n\nВыберите раздел:", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="👥 Пользователи",callback_data="admin:users"), InlineKeyboardButton(text="📊 Активность",callback_data="admin:activity")],
-            [InlineKeyboardButton(text="💰 Изменить баланс",callback_data="admin:adjust")],
+            [InlineKeyboardButton(text="Пользователи",icon_custom_emoji_id=USERS_BUTTON_EMOJI_ID,callback_data="admin:users"), InlineKeyboardButton(text="📊 Активность",callback_data="admin:activity")],
+            [InlineKeyboardButton(text="Изменить баланс",icon_custom_emoji_id=DEPOSIT_BUTTON_EMOJI_ID,callback_data="admin:adjust")],
             [InlineKeyboardButton(text="📝 Логи",callback_data="admin:logs")],
             [InlineKeyboardButton(text="💳 Пополнения",callback_data="admin:payments"), InlineKeyboardButton(text="💸 Выводы",callback_data="admin:withdrawals")],
         ]))
