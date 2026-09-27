@@ -39,6 +39,9 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", secrets.token_urlsafe(24))
 WEBAPP_AUTH_MAX_AGE = int(os.getenv("WEBAPP_AUTH_MAX_AGE", "86400"))
 REAL_ECONOMY = os.getenv("REAL_ECONOMY", "false").lower() == "true"
 REQUIRED_CHANNEL = os.getenv("REQUIRED_CHANNEL", "@resonant_casino")
+# Prefer the numeric Telegram channel ID in production (e.g. -1001234567890).
+# Username remains as a fallback so the bot can still work before CHANNEL_ID is configured.
+REQUIRED_CHANNEL_ID = os.getenv("REQUIRED_CHANNEL_ID", "").strip()
 REQUIRED_CHANNEL_URL = os.getenv("REQUIRED_CHANNEL_URL", "https://t.me/resonant_casino")
 WEBHOOK_PATH = f"/webhook/{WEBHOOK_SECRET}"
 
@@ -764,8 +767,9 @@ def _subscription_text() -> str:
 
 
 async def _is_channel_subscribed(user_id: int) -> bool:
+    chat_id = REQUIRED_CHANNEL_ID or REQUIRED_CHANNEL
     try:
-        member = await bot.get_chat_member(chat_id=REQUIRED_CHANNEL, user_id=user_id)
+        member = await bot.get_chat_member(chat_id=chat_id, user_id=user_id)
         status = getattr(member, "status", None)
         if status in {"member", "administrator", "creator"}:
             return True
@@ -773,8 +777,23 @@ async def _is_channel_subscribed(user_id: int) -> bool:
             return bool(getattr(member, "is_member", False))
         return False
     except Exception as exc:
-        logger.warning("Subscription check failed for %s in %s: %s", user_id, REQUIRED_CHANNEL, exc)
+        logger.exception("Subscription check failed for user=%s chat=%s", user_id, chat_id)
+        # A failed Telegram API check must never grant access.
         return False
+
+
+def _subscription_error_text() -> str:
+    if REQUIRED_CHANNEL_ID:
+        return (
+            "⚠️ Не удалось проверить подписку на канал.\n\n"
+            "Проверьте, что бот добавлен администратором в @resonant_casino, "
+            "а переменная REQUIRED_CHANNEL_ID содержит правильный ID канала."
+        )
+    return (
+        "⚠️ Не удалось проверить подписку на канал.\n\n"
+        "Для надёжной проверки добавьте бота администратором канала "
+        "и укажите его числовой ID в REQUIRED_CHANNEL_ID."
+    )
 
 
 class SubscriptionMiddleware(BaseMiddleware):
@@ -964,7 +983,9 @@ async def subscription_check(callback: CallbackQuery):
             await callback.message.answer(caption, reply_markup=_menu_keyboard(uid))
             await callback.message.answer("Выберите раздел:", reply_markup=_bottom_keyboard(uid))
     else:
-        await callback.answer("Подписка не найдена. Подпишитесь на канал и нажмите «Проверить» ещё раз.", show_alert=True)
+        await callback.answer("Подписка не найдена или Telegram не дал боту доступ к списку участников.", show_alert=True)
+        if callback.message:
+            await callback.message.answer(_subscription_error_text(), reply_markup=_subscription_keyboard())
 
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("menu:"))
