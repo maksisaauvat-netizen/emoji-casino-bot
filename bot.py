@@ -6,6 +6,7 @@ import os
 import traceback
 import random
 import secrets
+import re
 import time
 from pathlib import Path
 from typing import Optional
@@ -48,7 +49,98 @@ WEBHOOK_PATH = f"/webhook/{WEBHOOK_SECRET}"
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN is not set")
 
-bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+# Premium custom emoji used inside bot messages (not buttons).
+MESSAGE_EMOJI_IDS = {
+    "❌": "5210952531676504517",
+    "💰": "4965219701572503640",
+    "👤": "5249053508681883137",
+    "📈": "5028746137645876535",
+    "🏆": "5188344996356448758",
+    "📊": "6032808241891644148",
+    "📝": "5296410453742753454",
+    "💳": "5449624985301717991",
+    "💸": "5409048419211682843",
+    "⚙️": "5341715473882955310",
+    "❓": "5382187118216879236",
+    "➕": "5253652327734192243",
+    "➡️": "5416117059207572332",
+    "🤝": "4976940882071651344",
+    "🎮": "5438615665567084768",
+    "🤑": "5384105916331202592",
+    "💣": "5280569974404966639",
+    "⚖️": "5400250414929041085",
+    "🎡": "5226711870492126219",
+    "⚔️": "6334472841953544334",
+    "🃏": "5298499667569425533",
+    "🎰": "5384509325429463744",
+    "🎉": "5427088557460203446",
+    "💥": "5276032951342088188",
+    "⚡": "5438539112070002676",
+    "🚀": "5389057356493511934",
+}
+
+# Replace only visible emoji characters, leaving existing HTML tags and
+# already-rendered <tg-emoji> blocks untouched.
+_MESSAGE_EMOJI_PATTERN = re.compile(r"(<tg-emoji\b[^>]*>.*?</tg-emoji>|<[^>]+>)", re.DOTALL)
+
+def premiumize_message_text(text):
+    if not isinstance(text, str) or not text:
+        return text
+
+    def replace_visible(chunk: str) -> str:
+        for emoji, emoji_id in MESSAGE_EMOJI_IDS.items():
+            chunk = chunk.replace(emoji, f'<tg-emoji emoji-id="{emoji_id}">{emoji}</tg-emoji>')
+        return chunk
+
+    parts = _MESSAGE_EMOJI_PATTERN.split(text)
+    return "".join(part if part.startswith("<") else replace_visible(part) for part in parts)
+
+
+class PremiumEmojiBot(Bot):
+    async def send_message(self, *args, **kwargs):
+        if "text" in kwargs:
+            kwargs["text"] = premiumize_message_text(kwargs["text"])
+        elif len(args) >= 2:
+            args = list(args)
+            args[1] = premiumize_message_text(args[1])
+            args = tuple(args)
+        return await super().send_message(*args, **kwargs)
+
+    async def send_photo(self, *args, **kwargs):
+        if "caption" in kwargs:
+            kwargs["caption"] = premiumize_message_text(kwargs["caption"])
+        return await super().send_photo(*args, **kwargs)
+
+    async def send_animation(self, *args, **kwargs):
+        if "caption" in kwargs:
+            kwargs["caption"] = premiumize_message_text(kwargs["caption"])
+        return await super().send_animation(*args, **kwargs)
+
+    async def send_document(self, *args, **kwargs):
+        if "caption" in kwargs:
+            kwargs["caption"] = premiumize_message_text(kwargs["caption"])
+        return await super().send_document(*args, **kwargs)
+
+    async def edit_message_text(self, *args, **kwargs):
+        if "text" in kwargs:
+            kwargs["text"] = premiumize_message_text(kwargs["text"])
+        elif len(args) >= 3:
+            args = list(args)
+            args[2] = premiumize_message_text(args[2])
+            args = tuple(args)
+        return await super().edit_message_text(*args, **kwargs)
+
+    async def edit_message_caption(self, *args, **kwargs):
+        if "caption" in kwargs:
+            kwargs["caption"] = premiumize_message_text(kwargs["caption"])
+        elif len(args) >= 3:
+            args = list(args)
+            args[2] = premiumize_message_text(args[2])
+            args = tuple(args)
+        return await super().edit_message_caption(*args, **kwargs)
+
+
+bot = PremiumEmojiBot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 app = FastAPI(title="Resonant Casino")
 logger = logging.getLogger("resonant_casino")
@@ -786,12 +878,9 @@ def _subscription_keyboard():
 
 def _subscription_text() -> str:
     return (
-        "🔒 <b>Доступ к Resonant Casino</b>\n\n"
-        "Перед началом работы необходимо подписаться на наш канал:\n"
-        "📢 <b>@resonant_casino</b>\n\n"
-        "1. Нажмите «Подписаться на канал».\n"
-        "2. Вернитесь в бота.\n"
-        "3. Нажмите «Проверить подписку»."
+        "<b>Доступ к Resonant Casino</b>\n\n"
+        "Чтобы продолжить, подпишитесь на канал <b>@resonant_casino</b>.\n\n"
+        "После подписки нажмите «Проверить подписку»."
     )
 
 
@@ -814,14 +903,12 @@ async def _is_channel_subscribed(user_id: int) -> bool:
 def _subscription_error_text() -> str:
     if REQUIRED_CHANNEL_ID:
         return (
-            "⚠️ Не удалось проверить подписку на канал.\n\n"
-            "Проверьте, что бот добавлен администратором в @resonant_casino, "
-            "а переменная REQUIRED_CHANNEL_ID содержит правильный ID канала."
+            "<b>Не удалось проверить подписку</b>\n\n"
+            "Проверьте права бота в @resonant_casino и значение REQUIRED_CHANNEL_ID."
         )
     return (
-        "⚠️ Не удалось проверить подписку на канал.\n\n"
-        "Для надёжной проверки добавьте бота администратором канала "
-        "и укажите его числовой ID в REQUIRED_CHANNEL_ID."
+        "<b>Не удалось проверить подписку</b>\n\n"
+        "Добавьте бота администратором канала и укажите его числовой ID в REQUIRED_CHANNEL_ID."
     )
 
 
@@ -935,31 +1022,28 @@ def _profile_text(uid: int) -> str:
     username=p.get("username") or "—"
     app_id=p.get("id") or "—"
     return (
-        "╭────────────────────╮\n"
-        "       👤 | PROFILE\n"
-        "╰────────────────────╯\n\n"
-        f"👤 Username: <b>@{username}</b>\n"
-        f"🆔 Telegram ID: <code>{uid}</code>\n"
+        "<b>Профиль</b>\n\n"
+        f"👤 @{username}\n"
+        f"🆔 <code>{uid}</code>\n"
         f"🗃 App User ID: <code>{app_id}</code>\n\n"
-        f"💰 BALANCE: <b>{b:,.2f} ₽</b>\n\n"
-        f"🎮 ИГРЫ: <b>{s['games']}</b>\n"
-        f"🏆 ПОБЕДЫ: <b>{s['wins']}</b>\n"
-        f"❌ ПОРАЖЕНИЯ: <b>{s['losses']}</b>\n"
-        f"📈 WINRATE: <b>{s['winrate']}%</b>\n\n"
-        f"💵 СТАВКИ: <b>{s['turnover']:,} ₽</b>\n"
-        f"🏆 ВЫИГРАНО: <b>{s['payouts']:,} ₽</b>\n"
-        f"🔥 MAX WIN: <b>{s['max_win']:,} ₽</b>"
+        f"<b>Баланс:</b> {b:,.2f} ₽\n\n"
+        f"🎮 Игр: <b>{s['games']}</b>\n"
+        f"🏆 Побед: <b>{s['wins']}</b>\n"
+        f"❌ Поражений: <b>{s['losses']}</b>\n"
+        f"📈 Винрейт: <b>{s['winrate']}%</b>\n\n"
+        f"Оборот: <b>{s['turnover']:,} ₽</b>\n"
+        f"Выиграно: <b>{s['payouts']:,} ₽</b>\n"
+        f"Максимальный выигрыш: <b>{s['max_win']:,} ₽</b>"
     ).replace(",", " ")
+
 
 def _wallet_text(uid: int) -> str:
     b=get_balance(uid); s=get_user_stats(uid)
     return (
-        "╭────────────────────╮\n"
-        "       💰 | WALLET\n"
-        "╰────────────────────╯\n\n"
-        f"Баланс: <b>{b:,.2f} {M}</b>\n"
-        f"Оборот: <b>{s['turnover']:,} {M}</b>\n\n"
-        "Пополнение и вывод доступны через меню ниже."
+        "<b>Кошелёк</b>\n\n"
+        f"Баланс\n<b>{b:,.2f} ₽</b>\n\n"
+        f"Оборот\n<b>{s['turnover']:,} ₽</b>\n\n"
+        "Выберите действие ниже."
     ).replace(",", " ")
 
 def _games_text() -> str:
@@ -981,7 +1065,7 @@ def _games_text() -> str:
         "<b>Выберите игру:</b>")
 
 def _play_and_win_text() -> str:
-    return "🤑 <b>Resonant Original's</b>\n\n🎮 Авторские мини-игры против заведения\n\nВыберите, где хотите играть:"
+    return "<b>Resonant Original's</b>\n\nАвторские мини-игры против заведения.\n\nВыберите, где хотите играть:"
 
 @dp.message(CommandStart())
 async def start_handler(message: Message):
@@ -991,18 +1075,13 @@ async def start_handler(message: Message):
         await message.answer(_subscription_text(), reply_markup=_subscription_keyboard())
         return
     sync_profile(uid, message.from_user.username); log_event(uid, "bot_start")
-    caption=(
-        "╔══════════════════════╗\n"
-        "      🎰 RESONANT\n"
-        "        CASINO\n"
-        "╚══════════════════════╝"
-    )
+    caption="<b>Resonant Casino</b>\n\nДобро пожаловать. Выберите раздел ниже."
     if START_IMAGE.exists():
         await message.answer_photo(FSInputFile(START_IMAGE), caption=caption, reply_markup=_menu_keyboard(uid))
-        await message.answer("Выберите раздел:", reply_markup=_bottom_keyboard(uid))
+        await message.answer("<b>Выберите раздел:</b>", reply_markup=_bottom_keyboard(uid))
     else:
         await message.answer(caption, reply_markup=_menu_keyboard(uid))
-        await message.answer("Выберите раздел:", reply_markup=_bottom_keyboard(uid))
+        await message.answer("<b>Выберите раздел:</b>", reply_markup=_bottom_keyboard(uid))
 
 @dp.callback_query(lambda c: c.data == "subscription:check")
 async def subscription_check(callback: CallbackQuery):
@@ -1010,18 +1089,13 @@ async def subscription_check(callback: CallbackQuery):
     if await _is_channel_subscribed(uid):
         sync_profile(uid, callback.from_user.username)
         await callback.answer("Подписка подтверждена ✅")
-        caption = (
-            "╔══════════════════════╗\n"
-            "      🎰 RESONANT\n"
-            "        CASINO\n"
-            "╚══════════════════════╝"
-        )
+        caption = "<b>Resonant Casino</b>\n\nДобро пожаловать. Выберите раздел ниже."
         if START_IMAGE.exists():
             await callback.message.answer_photo(FSInputFile(START_IMAGE), caption=caption, reply_markup=_menu_keyboard(uid))
-            await callback.message.answer("Выберите раздел:", reply_markup=_bottom_keyboard(uid))
+            await callback.message.answer("<b>Выберите раздел:</b>", reply_markup=_bottom_keyboard(uid))
         else:
             await callback.message.answer(caption, reply_markup=_menu_keyboard(uid))
-            await callback.message.answer("Выберите раздел:", reply_markup=_bottom_keyboard(uid))
+            await callback.message.answer("<b>Выберите раздел:</b>", reply_markup=_bottom_keyboard(uid))
     else:
         await callback.answer("Подписка не найдена или Telegram не дал боту доступ к списку участников.", show_alert=True)
         if callback.message:
@@ -1047,15 +1121,14 @@ async def menu_callbacks(callback: CallbackQuery):
         await callback.message.answer("Введите Telegram ID пользователя.")
         await callback.answer(); return
     if action=="home":
-        await _edit_menu(callback, "╔══════════════════════╗\n      🎰 RESONANT\n        CASINO\n╚══════════════════════╝", _menu_keyboard(uid))
+        await _edit_menu(callback, "<b>Resonant Casino</b>\n\nВыберите раздел.", _menu_keyboard(uid))
     elif action=="profile":
         await _edit_menu(callback, _profile_text(uid), _profile_keyboard(uid))
     elif action=="wallet":
         await _edit_menu(callback, _wallet_text(uid), _wallet_keyboard())
     elif action=="bonuses":
         await _edit_menu(callback,
-            "╭────────────────────╮\n       🎁 | BONUS\n╰────────────────────╯\n\n"
-            "Бонусы и реферальная система доступны в приложении.",
+            "<b>Бонусы</b>\n\nБонусы и реферальная система доступны в приложении.",
             InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="Назад", callback_data="menu:home", icon_custom_emoji_id=BACK_BUTTON_EMOJI_ID)]
             ]))
@@ -1068,12 +1141,12 @@ async def profile_callbacks(callback: CallbackQuery):
     uid=callback.from_user.id; sync_profile(uid, callback.from_user.username); action=callback.data.split(":",1)[1]
     if action=="games":
         rows=get_game_history(uid,10)
-        text="╭────────────────────╮\n       🎮 | ИСТОРИЯ ИГР\n╰────────────────────╯\n\n"
+        text="<b>История игр</b>\n\n"
         text += "\n".join(f"#{r['id']} {r['game']} · {r['stake']} ₽ · {r['result']} · {r['payout']} ₽" for r in rows) or "История пуста."
     else:
         code=f"ref_{uid}"
         link=f"https://t.me/{BOT_USERNAME}?start={code}" if BOT_USERNAME else f"Код: {code}"
-        text=f"╭────────────────────╮\n       🤝 | REFERRAL\n╰────────────────────╯\n\nВаша реферальная ссылка:\n<code>{link}</code>"
+        text=f"<b>Реферальная система</b>\n\nВаша ссылка:\n<code>{link}</code>"
     await _edit_menu(callback,text,_profile_keyboard(uid)); await callback.answer()
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("wallet:"))
@@ -1081,13 +1154,13 @@ async def wallet_callbacks(callback: CallbackQuery):
     uid=callback.from_user.id; sync_profile(uid, callback.from_user.username); action=callback.data.split(":",1)[1]
     if action=="history":
         p=get_payment_history(uid,10); w=get_withdrawal_history(uid,10)
-        text="╭────────────────────╮\n       📜 | ИСТОРИЯ\n╰────────────────────╯\n\n"
+        text="<b>История операций</b>\n\n"
         text+="Пополнения:\n"+("\n".join(f"#{x['id']} {x['amount_rub']} ₽ · {x['status']}" for x in p) or "—")
         text+="\n\nВыводы:\n"+("\n".join(f"#{x['id']} {x['amount_rub']} ₽ · {x['status']}" for x in w) or "—")
         await _edit_menu(callback,text,_wallet_keyboard())
     elif action=="deposit":
         bot_sessions[uid]={"step":"deposit_amount"}
-        await callback.message.answer("Введите сумму пополнения в USDT. После этого бот создаст Crypto Pay invoice.")
+        await callback.message.answer("Введите сумму пополнения в USDT.")
     elif action=="withdraw":
         bot_sessions[uid]={"step":"withdraw_amount"}
         await callback.message.answer("Введите сумму вывода в ₽.")
@@ -1098,17 +1171,17 @@ async def game_callbacks(callback: CallbackQuery):
     uid=callback.from_user.id; sync_profile(uid, callback.from_user.username); g=callback.data.split(":",1)[1]; ensure_user(uid)
     if g=="slot":
         bot_sessions[uid]={"step":"slot_amount"}
-        await callback.message.answer("╭────────────────────╮\n       🎰 SLOTS\n╰────────────────────╯\n\n💎 Ставка:\n\nМинимальная ставка: <b>10 ₽</b>\nМаксимальная ставка: <b>5000 ₽</b>\n\nОтправьте сумму одним сообщением.")
+        await callback.message.answer("<b>🎰 SLOTS</b>\n\nСтавка: <b>10–5 000 ₽</b>\n\nВведите сумму ставки.")
     elif g=="mines":
         bot_sessions[uid]={"step":"mines_amount"}
-        await callback.message.answer("╭────────────────────╮\n       💣 MINES\n╰────────────────────╯\n\n💎 ВВЕДИТЕ СТАВКУ\n\nМинимальная ставка: <b>10 ₽</b>\nМаксимальная ставка: <b>5000 ₽</b>\n\nОтправьте сумму одним сообщением.\n\nНапример: <b>10</b>")
+        await callback.message.answer("<b>💣 Mines</b>\n\nСтавка: <b>10–5 000 ₽</b>\n\nВведите сумму ставки.\nНапример: <b>100</b>.")
     elif g=="dice":
-        await callback.message.answer("╭────────────────────╮\n       🎲 DICE\n╰────────────────────╯\n\nВыберите режим:",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Один бросок",callback_data="dice:one")],[InlineKeyboardButton(text="Два броска",callback_data="dice:two")],[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]]))
+        await callback.message.answer("<b>🎲 Dice</b>\n\nВыберите режим.",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Один бросок",callback_data="dice:one")],[InlineKeyboardButton(text="Два броска",callback_data="dice:two")],[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]]))
     elif g=="upgrader":
-        upgrade_sessions[uid]={"step":"amount"}; await callback.message.answer("⚡ UPGRADER\nВведите сумму ставки (10–5000 ₽).")
+        upgrade_sessions[uid]={"step":"amount"}; await callback.message.answer("<b>⚡ Upgrader</b>\n\nСтавка: <b>10–5 000 ₽</b>\nВведите сумму ставки.")
     elif g in {"crash","x50"}:
         game_title = "🚀 CRASH" if g == "crash" else "🎡 x50"
-        await callback.message.answer(f"╭────────────────────╮\n       {game_title}\n╰────────────────────╯\n\nЭтот режим доступен в приложении.\nДля запуска откройте его через кнопку «🎰 • Играть в приложении» в разделе GAMES.",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]]))
+        await callback.message.answer(f"<b>{game_title}</b>\n\nЭтот режим доступен в приложении.\nОткройте его через «Играть в приложении».",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]]))
     else:
         await callback.message.answer("Неизвестная игра.",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]]))
     await callback.answer()
@@ -1143,7 +1216,7 @@ async def slot_confirm(callback: CallbackQuery):
     if payout: change_balance(uid,payout, f"game_payout:{game}" if "game" in locals() else "game_payout")
     record_game(uid,"slots_bot",stake,"win" if payout else "loss",mult,payout,rs["round_hash"],rs["server_seed"]); log_event(uid,"game_slots_bot",f"stake={stake} combo={combo} payout={payout}"); bot_sessions.pop(uid,None)
     result=f"🎉 Выигрыш: <b>{payout} ₽</b>" if payout else "❌ Проигрыш"
-    await callback.message.answer(f"╭────────────────────╮\n       🎰 SLOTS\n╰────────────────────╯\n\n💎 Ставка: <b>{stake} ₽</b>\n\n<code>{combo}</code>\n\n{result}\n\nХэш раунда: <code>{rs['round_hash']}</code>\nServer seed: <code>{rs['server_seed']}</code>\n\n🍋🍋🍋 — ×10\n7️⃣7️⃣7️⃣ — ×50\n3 одинаковых — ×3.5\n2 одинаковых — ×1.85\nДругие комбинации — проигрыш.",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎰 Ещё раз",callback_data="game:slot")],[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]])); await callback.answer()
+    await callback.message.answer(f"<b>Slots</b>\n\nСтавка: <b>{stake} ₽</b>\nРезультат: <code>{combo}</code>\n\n{result}\n\nРаунд: <code>{rs['round_hash']}</code>",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎰 Ещё раз",callback_data="game:slot")],[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]])); await callback.answer()
 
 def mines_bot_keyboard(opened):
     rows=[]
@@ -1157,7 +1230,7 @@ async def mines_callbacks(callback: CallbackQuery):
         s=bot_sessions.get(uid,{})
         if s.get("step")!="mines_count": await callback.answer("Сессия не найдена",show_alert=True); return
         s.update({"step":"mines_confirm","mines_count":int(parts[2])})
-        await callback.message.answer(f"💣 MINES\n\nСтавка: <b>{s['stake']} ₽</b>\nБомб: <b>{s['mines_count']}</b>\n\nПодтвердить ставку?",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подтвердить ставку",callback_data="minesconfirm:yes"),InlineKeyboardButton(text="Отмена",callback_data="minesconfirm:no")]]))
+        await callback.message.answer(f"<b>💣 Mines</b>\n\nСтавка: <b>{s['stake']} ₽</b>\nБомб: <b>{s['mines_count']}</b>\n\nПодтвердить ставку?",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подтвердить ставку",callback_data="minesconfirm:yes"),InlineKeyboardButton(text="Отмена",callback_data="minesconfirm:no")]]))
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("minesconfirm:"))
@@ -1170,7 +1243,7 @@ async def mines_confirm(callback: CallbackQuery):
     rs=new_round("mines_bot",uid); pool=list(range(25))
     for i in range(24,0,-1): j=pf_index(rs,"mines",25,i)%(i+1); pool[i],pool[j]=pool[j],pool[i]
     bot_active_games[uid]={"type":"mines","stake":stake,"mines":pool[:mc],"opened":[],"multiplier":1.0,"round":rs}; bot_sessions.pop(uid,None)
-    await callback.message.answer("╭────────────────────╮\n       💣 MINES\n╰────────────────────╯\n\nОткройте клетку:",reply_markup=mines_bot_keyboard([])); await callback.answer()
+    await callback.message.answer("<b>💣 Mines</b>\n\nОткройте клетку:",reply_markup=mines_bot_keyboard([])); await callback.answer()
 
 @dp.callback_query(lambda c: c.data and c.data.startswith("bmines:"))
 async def bot_mines_play(callback: CallbackQuery):
@@ -1181,13 +1254,13 @@ async def bot_mines_play(callback: CallbackQuery):
         if not g["opened"]: await callback.answer("Сначала откройте клетку",show_alert=True); return
         payout=int(round(g["stake"]*g["multiplier"])); change_balance(uid,payout, f"game_payout:{game}" if "game" in locals() else "game_payout"); rs=g["round"]
         record_game(uid,"mines_bot",g["stake"],"win",g["multiplier"],payout,rs["round_hash"],rs["server_seed"]); log_event(uid,"game_mines_bot",f"stake={g['stake']} payout={payout}"); bot_active_games.pop(uid,None)
-        await callback.message.answer(f"🎉 Вы забрали <b>{payout} ₽</b> · x{g['multiplier']:.2f}\nХэш раунда: <code>{rs['round_hash']}</code>\nServer seed: <code>{rs['server_seed']}</code>",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="💣 Ещё раз",callback_data="game:mines")]])); await callback.answer(); return
+        await callback.message.answer(f"<b>Mines — выигрыш</b>\n\nКоэффициент: <b>x{g['multiplier']:.2f}</b>\nВыигрыш: <b>{payout} ₽</b>\n\nРаунд: <code>{rs['round_hash']}</code>",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="💣 Ещё раз",callback_data="game:mines")]])); await callback.answer(); return
     idx=int(action.split(":",1)[1])
     if idx in g["opened"]: await callback.answer("Клетка уже открыта",show_alert=True); return
     rs=g["round"]
     if idx in g["mines"]:
         record_game(uid,"mines_bot",g["stake"],"loss",0,0,rs["round_hash"],rs["server_seed"]); log_event(uid,"game_mines_bot",f"stake={g['stake']} mine={idx}"); bot_active_games.pop(uid,None)
-        await callback.message.answer(f"💥 Мина! Вы проиграли <b>{g['stake']} ₽</b>.\nХэш раунда: <code>{rs['round_hash']}</code>\nServer seed: <code>{rs['server_seed']}</code>",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="💣 Ещё раз",callback_data="game:mines")]])); await callback.answer(); return
+        await callback.message.answer(f"<b>Mines — проигрыш</b>\n\nМина открыта. Ставка: <b>{g['stake']} ₽</b>\n\nРаунд: <code>{rs['round_hash']}</code>",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="💣 Ещё раз",callback_data="game:mines")]])); await callback.answer(); return
     g["opened"].append(idx); g["multiplier"]=mines_multiplier(len(g["mines"]),len(g["opened"]))
     await callback.message.edit_reply_markup(reply_markup=mines_bot_keyboard(g["opened"])); await callback.answer(f"Безопасно · x{g['multiplier']:.2f}")
 
@@ -1203,7 +1276,7 @@ async def dice_confirm(callback: CallbackQuery):
     if payout: change_balance(uid,payout, f"game_payout:{game}" if "game" in locals() else "game_payout")
     record_game(uid,"dice_bot",stake,"win" if won else "loss",mult if won else 0,payout,rs["round_hash"],rs["server_seed"]); log_event(uid,"game_dice_bot",f"stake={stake} dice={d1},{d2} bet={bet} payout={payout}"); bot_sessions.pop(uid,None)
     rolls=f"🎲 {d1}" if mode=="one" else f"🎲 {d1} + {d2} = <b>{total}</b>"; result=f"🎉 Выигрыш: <b>{payout} ₽</b>" if payout else "❌ Проигрыш"
-    await callback.message.answer(f"╭────────────────────╮\n       🎲 DICE\n╰────────────────────╯\n\n{rolls}\n\n{result}\n\nХэш раунда: <code>{rs['round_hash']}</code>\nServer seed: <code>{rs['server_seed']}</code>",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎲 Ещё раз",callback_data="game:dice")],[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]])); await callback.answer()
+    await callback.message.answer(f"<b>🎲 Dice</b>\n\n{rolls}\n\n{result}\n\nРаунд: <code>{rs['round_hash']}</code>",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎲 Ещё раз",callback_data="game:dice")],[InlineKeyboardButton(text="⬅️ Игры",callback_data="menu:games")]])); await callback.answer()
 
 
 # ============================================================
@@ -1260,7 +1333,7 @@ async def reference_game_start(callback: CallbackQuery):
         await callback.answer("Сначала завершите текущую игру", show_alert=True); return
     if game == "mines":
         bot_sessions[uid] = {"step": "mines_amount"}
-        await callback.message.answer("💣 <b>MINES</b>\n\nВведите ставку: <b>10–5000 ₽</b>.", reply_markup=ref_amount_keyboard(game))
+        await callback.message.answer("<b>💣 Mines</b>\n\nВведите ставку: <b>10–5 000 ₽</b>.", reply_markup=ref_amount_keyboard(game))
         await callback.answer()
         return
     bot_sessions[uid] = {"step": "ref_amount", "game": game}
@@ -1283,7 +1356,7 @@ async def reference_stake(callback: CallbackQuery):
     if game == "mines":
         bot_sessions[uid] = {"step": "mines_count", "stake": stake}
         rows=[[InlineKeyboardButton(text=str(a),callback_data=f"mines:count:{a}") for a in range(2,14)], [InlineKeyboardButton(text=str(a),callback_data=f"mines:count:{a}") for a in range(14,25)]]
-        await callback.message.answer(f"💣 <b>MINES</b>\nСтавка: <b>{stake} ₽</b>\nВыберите количество бомб:", reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+        await callback.message.answer(f"<b>💣 Mines</b>\n\nСтавка: <b>{stake} ₽</b>\nВыберите количество бомб:", reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
         await callback.answer()
         return
     bot_sessions[uid] = {"step": "ref_options", "game": game, "stake": stake}
@@ -1454,8 +1527,8 @@ async def admin_callbacks(callback: CallbackQuery):
         await callback.answer("Доступ запрещен", show_alert=True); return
     parts=callback.data.split(":",2); action=parts[1]
     if action=="home":
-        text=("╭────────────────────╮\n       🛠 | ADMIN PANEL\n╰────────────────────╯\n\n"
-              "Панель бота синхронизирована с базой Mini App.\n"
+        text=("<b>Admin panel</b>\n\n"
+              "Бот синхронизирован с базой Mini App.\n"
               "Баланс и профили общие для обоих интерфейсов.")
         markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Пользователи",icon_custom_emoji_id=USERS_BUTTON_EMOJI_ID,callback_data="admin:users"), InlineKeyboardButton(text="📊 Активность",callback_data="admin:activity")],
@@ -1466,7 +1539,7 @@ async def admin_callbacks(callback: CallbackQuery):
         ])
     elif action=="users":
         rows=get_all_users(25)
-        text="👥 <b>ПОЛЬЗОВАТЕЛИ</b>\n\n" + ("\n".join(f"{r.get('username') or 'без username'} · <code>{r['user_id']}</code> · <b>{float(r['balance']):.2f} ₽</b>" for r in rows) or "—")
+        text="<b>Пользователи</b>\n\n" + ("\n".join(f"{r.get('username') or 'без username'} · <code>{r['user_id']}</code> · <b>{float(r['balance']):.2f} ₽</b>" for r in rows) or "—")
         buttons=[]
         for r in rows[:20]:
             label=("@"+str(r['username'])) if r.get('username') else str(r['user_id'])
@@ -1482,7 +1555,7 @@ async def admin_callbacks(callback: CallbackQuery):
         if not profile: await callback.answer("Пользователь не найден",show_alert=True); return
         stats=profile['stats']
         entries=get_user_ledger(target,20)
-        text=(f"👤 <b>ПОЛЬЗОВАТЕЛЬ</b>\n\nApp User ID: <code>{profile.get('id','—')}</code>\nTelegram ID: <code>{profile['telegram_id']}</code>\n"
+        text=(f"<b>Пользователь</b>\n\nApp User ID: <code>{profile.get('id','—')}</code>\nTelegram ID: <code>{profile['telegram_id']}</code>\n"
               f"Username: @{profile.get('username') or '—'}\nБаланс: <b>{profile['balance']:.2f} ₽</b>\n\n"
               f"Игры: {stats['games']} · Победы: {stats['wins']} · Поражения: {stats['losses']}\n"
               f"Winrate: {stats['winrate']}%\nОборот: {stats['turnover']} ₽\nВыиграно: {stats['payouts']} ₽\nMax Win: {stats['max_win']} ₽\n\n"
@@ -1490,14 +1563,14 @@ async def admin_callbacks(callback: CallbackQuery):
         markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Изменить баланс",icon_custom_emoji_id=DEPOSIT_BUTTON_EMOJI_ID,callback_data=f"admin:adjust:{target}")],[InlineKeyboardButton(text="⬅️ Пользователи",callback_data="admin:users")]])
     elif action=="activity":
         rows=get_ledger_activity(40)
-        text="📊 <b>АКТИВНОСТЬ / LEDGER</b>\n\n"+("\n".join(f"#{r['id']} · {r.get('username') or r['user_id']} · <b>{float(r['amount']):+.2f} ₽</b> · {r['reason']}" for r in rows) or "—")
+        text="<b>Активность</b>\n\n"+("\n".join(f"#{r['id']} · {r.get('username') or r['user_id']} · <b>{float(r['amount']):+.2f} ₽</b> · {r['reason']}" for r in rows) or "—")
         markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
     elif action=="logs":
-        rows=get_audit_logs(40); text="📝 <b>ЛОГИ</b>\n\n"+("\n".join(f"#{r['id']} · {r.get('user_id','—')} · {r['action']} · {r['details']}" for r in rows) or "—"); markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
+        rows=get_audit_logs(40); text="<b>Логи</b>\n\n"+("\n".join(f"#{r['id']} · {r.get('user_id','—')} · {r['action']} · {r['details']}" for r in rows) or "—"); markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
     elif action=="payments":
-        rows=get_all_payments(30); text="💳 <b>ПОПОЛНЕНИЯ</b>\n\n"+("\n".join(f"#{r['id']} · {r['user_id']} · {float(r['amount_rub']):.2f} ₽ · {r['status']}" for r in rows) or "—"); markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
+        rows=get_all_payments(30); text="<b>Пополнения</b>\n\n"+("\n".join(f"#{r['id']} · {r['user_id']} · {float(r['amount_rub']):.2f} ₽ · {r['status']}" for r in rows) or "—"); markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
     elif action=="withdrawals":
-        rows=__import__('database').get_pending_withdrawals(30); text="💸 <b>ВЫВОДЫ</b>\n\n"+("\n".join(f"#{r['id']} · {r['user_id']} · {float(r['amount_rub']):.2f} ₽ · {r['status']}" for r in rows) or "—"); markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
+        rows=__import__('database').get_pending_withdrawals(30); text="<b>Выводы</b>\n\n"+("\n".join(f"#{r['id']} · {r['user_id']} · {float(r['amount_rub']):.2f} ₽ · {r['status']}" for r in rows) or "—"); markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⬅️ Admin",callback_data="admin:home")]])
     elif action=="adjust":
         target=parts[2] if len(parts)>2 else ""
         if target:
@@ -1528,7 +1601,7 @@ async def upgrade_command(message: Message):
     uid=message.from_user.id
     ensure_user(uid)
     upgrade_sessions[uid]={"step":"amount"}
-    await message.answer("⚡ <b>UPGRADER</b>\n\nОтправьте сумму ставки одним сообщением.\nНапример: <b>100</b>")
+    await message.answer("<b>⚡ Upgrader</b>\n\nВведите сумму ставки.\nНапример: <b>100</b>.")
 
 @dp.message(Command("admin"))
 async def admin_command(message: Message):
@@ -1536,7 +1609,7 @@ async def admin_command(message: Message):
         await message.answer("Доступ запрещен.")
         return
     await message.answer(
-        f"🛠 <b>ADMIN PANEL</b>\n\nTelegram ID: <code>{message.from_user.id}</code>\n\nВыберите раздел:",
+        f"<b>Admin panel</b>\n\nTelegram ID: <code>{message.from_user.id}</code>\n\nВыберите раздел:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Пользователи",icon_custom_emoji_id=USERS_BUTTON_EMOJI_ID,callback_data="admin:users"), InlineKeyboardButton(text="📊 Активность",callback_data="admin:activity")],
             [InlineKeyboardButton(text="Изменить баланс",icon_custom_emoji_id=DEPOSIT_BUTTON_EMOJI_ID,callback_data="admin:adjust")],
@@ -1546,7 +1619,7 @@ async def admin_command(message: Message):
     )
     # Refresh the persistent bottom keyboard so the admin button appears immediately
     # after a newly authorized admin deploys or changes ADMIN_TELEGRAM_IDS.
-    await message.answer("Меню обновлено.", reply_markup=_bottom_keyboard(message.from_user.id))
+    await message.answer("<b>Меню обновлено.</b>", reply_markup=_bottom_keyboard(message.from_user.id))
 
 async def _send_section_photo(message: Message, image_path: Path, caption: str, reply_markup):
     """Send a section hero image with its normal section controls."""
@@ -1580,7 +1653,7 @@ async def upgrade_message_router(message: Message):
             await message.answer("Доступ запрещен.")
             return
         await message.answer(
-            f"🛠 <b>ADMIN PANEL</b>\n\nTelegram ID: <code>{uid}</code>\n\nВыберите раздел:",
+            f"<b>Admin panel</b>\n\nTelegram ID: <code>{uid}</code>\n\nВыберите раздел:",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="Пользователи",icon_custom_emoji_id=USERS_BUTTON_EMOJI_ID,callback_data="admin:users"), InlineKeyboardButton(text="📊 Активность",callback_data="admin:activity")],
                 [InlineKeyboardButton(text="Изменить баланс",icon_custom_emoji_id=DEPOSIT_BUTTON_EMOJI_ID,callback_data="admin:adjust")],
@@ -1588,7 +1661,7 @@ async def upgrade_message_router(message: Message):
                 [InlineKeyboardButton(text="💳 Пополнения",callback_data="admin:payments"), InlineKeyboardButton(text="💸 Выводы",callback_data="admin:withdrawals")],
             ]),
         )
-        await message.answer("Меню обновлено.", reply_markup=_bottom_keyboard(uid))
+        await message.answer("<b>Меню обновлено.</b>", reply_markup=_bottom_keyboard(uid))
         return
     if session:
         if session.get("step")=="deposit_amount":
@@ -1609,7 +1682,7 @@ async def upgrade_message_router(message: Message):
             except ValueError: amount=0
             if amount<=0: await message.answer("Введите сумму в ₽."); return
             bot_sessions[uid]={"step":"withdraw_details","amount":amount}
-            await message.answer("Отправьте реквизиты/данные выплаты. Заявка будет видна в ADMIN PANEL.")
+            await message.answer("Отправьте реквизиты для выплаты. Заявка будет передана в админ-панель.")
             return
         if session.get("step")=="withdraw_details":
             amount=int(session["amount"]); result=create_withdrawal(uid,amount,text)
@@ -1621,13 +1694,13 @@ async def upgrade_message_router(message: Message):
     if session and session.get("step") in {"slot_amount","mines_amount","dice_amount"}:
         try: amount=int(float(text.replace(',','.').replace(' ','').replace('₽','')))
         except ValueError: amount=0
-        if not 10<=amount<=5000: await message.answer("Сумма ставки должна быть от <b>10 ₽</b> до <b>5000 ₽</b>."); return
+        if not 10<=amount<=5000: await message.answer("Ставка должна быть от <b>10 до 5 000 ₽</b>."); return
         if session["step"]=="slot_amount":
-            session.update({"step":"slot_confirm","stake":amount}); await message.answer(f"🎰 SLOTS\n\n💎 Ставка: <b>{amount} ₽</b>\n\nПодтвердить ставку?",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подтвердить ставку",callback_data="slotconfirm:yes"),InlineKeyboardButton(text="Отмена",callback_data="slotconfirm:cancel")]]))
+            session.update({"step":"slot_confirm","stake":amount}); await message.answer(f"<b>🎰 Slots</b>\n\nСтавка: <b>{amount} ₽</b>\n\nПодтвердить ставку?",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подтвердить ставку",callback_data="slotconfirm:yes"),InlineKeyboardButton(text="Отмена",callback_data="slotconfirm:cancel")]]))
         elif session["step"]=="mines_amount":
-            session.update({"step":"mines_count","stake":amount}); rows=[[InlineKeyboardButton(text=str(a),callback_data=f"mines:count:{a}") for a in range(2,14)],[InlineKeyboardButton(text=str(a),callback_data=f"mines:count:{a}") for a in range(14,25)]]; await message.answer(f"💣 MINES\n\n💎 Ставка: <b>{amount} ₽</b>\n\nВыберите количество бомб:",reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+            session.update({"step":"mines_count","stake":amount}); rows=[[InlineKeyboardButton(text=str(a),callback_data=f"mines:count:{a}") for a in range(2,14)],[InlineKeyboardButton(text=str(a),callback_data=f"mines:count:{a}") for a in range(14,25)]]; await message.answer(f"<b>💣 Mines</b>\n\nСтавка: <b>{amount} ₽</b>\n\nВыберите количество бомб:",reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
         else:
-            session.update({"step":"dice_confirm","stake":amount}); await message.answer(f"🎲 DICE\n\nСтавка: <b>{amount} ₽</b>\nРежим: {'один бросок' if session['mode']=='one' else 'два броска'}\nВыбор: <b>{session['bet']}</b>\n\nПодтвердить ставку?",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подтвердить ставку",callback_data="diceconfirm:yes"),InlineKeyboardButton(text="Отмена",callback_data="diceconfirm:no")]]))
+            session.update({"step":"dice_confirm","stake":amount}); await message.answer(f"<b>🎲 Dice</b>\n\nСтавка: <b>{amount} ₽</b>\nРежим: {'один бросок' if session['mode']=='one' else 'два броска'}\nВыбор: <b>{session['bet']}</b>\n\nПодтвердить ставку?",reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Подтвердить ставку",callback_data="diceconfirm:yes"),InlineKeyboardButton(text="Отмена",callback_data="diceconfirm:no")]]))
         return
 
     if session and session.get("step")=="admin_target":
@@ -1640,7 +1713,7 @@ async def upgrade_message_router(message: Message):
     if session and session.get("step")=="admin_amount":
         if not is_admin(uid): bot_sessions.pop(uid,None); return
         try: amount=int(text.replace("₽","").replace(" ",""))
-        except ValueError: await message.answer("Введите целое число со знаком."); return
+        except ValueError: await message.answer("Введите целое число со знаком, например <b>+500</b> или <b>-500</b>."); return
         target=int(session["target"]); ensure_user(target); new_balance=change_balance(target,amount)
         log_event(uid,"admin_balance_adjust",f"target={target} amount={amount}")
         log_event(target,"admin_balance_changed",f"amount={amount}")
@@ -1654,7 +1727,7 @@ async def upgrade_message_router(message: Message):
         except ValueError:
             amount=0
         if not 10 <= amount <= 5000:
-            await message.answer("Ставка должна быть от 10 до 5000 ₽.")
+            await message.answer("Ставка должна быть от <b>10 до 5 000 ₽</b>.")
             return
         game=session["game"]
         session.update({"step":"ref_options","stake":amount})
@@ -1724,7 +1797,7 @@ async def run_upgrade_bot(message: Message, uid: int):
     record_game(uid,"upgrader",stake,"win" if won else "loss",mult if won else 0,payout,rs["round_hash"],rs["server_seed"])
     log_event(uid, "game_upgrader", f"stake={stake} result={'win' if won else 'loss'} payout={payout}")
     await message.answer(
-        f"⚡ <b>UPGRADER</b>\nСтавка: <b>{stake} ₽</b>\nШанс: <b>{pct:.2f}%</b>\nКоэффициент: <b>x{mult:.2f}</b>\nХэш раунда: <code>{rs['round_hash']}</code>"
+        f"<b>Upgrader</b>\n\nСтавка: <b>{stake} ₽</b>\nШанс: <b>{pct:.2f}%</b>\nКоэффициент: <b>x{mult:.2f}</b>\nРаунд: <code>{rs['round_hash']}</code>"
     )
     if UPGRADE_GIF.exists():
         await message.answer_animation(FSInputFile(UPGRADE_GIF), caption="Прокрутка…")
