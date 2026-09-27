@@ -9,6 +9,7 @@ import random
 import secrets
 import re
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -30,7 +31,7 @@ from database import (
     get_withdrawal_history, create_withdrawal, record_game,
     get_audit_logs, get_all_users, get_all_payments, get_user_profile, get_user_profile_by_app_id, get_user_ledger, get_ledger_activity, log_event,
     approve_withdrawal, reject_withdrawal, start_withdrawal_processing, complete_withdrawal,
-    count_users, get_setting, set_setting,
+    count_users, get_setting, set_setting, get_financial_stats,
 )
 from payments import create_invoice, process_paid_invoice, get_invoice, create_withdrawal_payout
 
@@ -39,7 +40,7 @@ _record_game_db = record_game
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 BASE_URL = os.getenv("BASE_URL", "https://example.com").rstrip("/")
-WEBAPP_URL = os.getenv("WEBAPP_URL", BASE_URL)
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://ice-casino-web.onrender.com")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 if not WEBHOOK_SECRET:
     raise RuntimeError("WEBHOOK_SECRET must be set in production")
@@ -223,9 +224,20 @@ MIN_BET_USD = float(os.getenv("MIN_BET_USD", "0.10"))
 MAX_BET_USD = float(os.getenv("MAX_BET_USD", "5000.00"))
 
 # Telegram Premium custom emoji used as native button icons.
-PLAY_AND_WIN_BUTTON_EMOJI_ID = "5384105916331202592"
+PLAY_AND_WIN_BUTTON_EMOJI_ID = "5055840333242303386"
 WALLET_BUTTON_EMOJI_ID = "4965219701572503640"
 PROFILE_BUTTON_EMOJI_ID = "5019726470101075726"
+WELCOME_TEXT_EMOJI_ID = "5418298958428527841"
+ORIGINALS_TEXT_EMOJI_ID = "5463408317038619872"
+WALLET_TEXT_EMOJI_ID = "4965219701572503640"
+WALLET_BALANCE_EMOJI_ID = "5197434882321567830"
+WALLET_TURNOVER_BETS_EMOJI_ID = "5451882707875276247"
+WALLET_TURNOVER_DEPOSITS_EMOJI_ID = "5028746137645876535"
+PROFILE_TEXT_EMOJI_ID = "5019726470101075726"
+PROFILE_ID_EMOJI_ID = "5341715473882955310"
+PROFILE_SINCE_EMOJI_ID = "5427337910376504569"
+PROFILE_WINRATE_EMOJI_ID = "5229064374403998351"
+PROFILE_PROFIT_EMOJI_ID = "5028746137645876535"
 BONUSES_BUTTON_EMOJI_ID = "5215203359593617488"
 PLAY_BUTTON_EMOJI_ID = "5438615665567084768"
 HELP_BUTTON_EMOJI_ID = "5395695537687123235"
@@ -1050,35 +1062,70 @@ async def _edit_menu(callback: CallbackQuery, text: str, markup: InlineKeyboardM
         except Exception:
             await callback.message.answer(text, reply_markup=markup)
 
+def _fmt_money(value: float) -> str:
+    return f"{float(value):.2f}"
+
+
+def _fmt_date(value) -> str:
+    if not value:
+        return "—"
+    if isinstance(value, (int, float)):
+        dt = datetime.fromtimestamp(value, tz=timezone.utc)
+    elif isinstance(value, datetime):
+        dt = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    else:
+        try:
+            dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            dt = dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            return "—"
+    return dt.strftime("%d.%m.%Y")
+
+
+def _days_with_us(created_at) -> int:
+    if not created_at:
+        return 0
+    if isinstance(created_at, (int, float)):
+        dt = datetime.fromtimestamp(created_at, tz=timezone.utc)
+    elif isinstance(created_at, datetime):
+        dt = created_at if created_at.tzinfo else created_at.replace(tzinfo=timezone.utc)
+    else:
+        try:
+            dt = datetime.fromisoformat(str(created_at).replace("Z", "+00:00"))
+            dt = dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        except Exception:
+            return 0
+    return max(0, (datetime.now(timezone.utc) - dt).days)
+
+
 def _profile_text(uid: int) -> str:
-    s=get_user_stats(uid); b=get_balance(uid); p=get_user_profile(uid) or {}
-    username=p.get("username") or "—"
-    app_id=p.get("id") or "—"
+    p = get_user_profile(uid) or {}
+    s = get_user_stats(uid)
+    username = p.get("username") or "—"
+    app_id = p.get("id") or "—"
+    tg_id = p.get("telegram_id") or uid
+    financial = get_financial_stats(uid)
     return (
-        "<b>Профиль</b>\n\n"
-        f"👤 @{username}\n"
-        f"🆔 <code>{uid}</code>\n"
-        f"🗃 App User ID: <code>{app_id}</code>\n\n"
-        f"👥 Пользователей: <b>{count_users():,}</b>\n\n"
-        f"<b>Баланс:</b> {b:,.2f} $\n\n"
-        f"🎮 Игр: <b>{s['games']}</b>\n"
-        f"🏆 Побед: <b>{s['wins']}</b>\n"
-        f"❌ Поражений: <b>{s['losses']}</b>\n"
-        f"📈 Винрейт: <b>{s['winrate']}%</b>\n\n"
-        f"Оборот: <b>{s['turnover']:,} $</b>\n"
-        f"Выиграно: <b>{s['payouts']:,} $</b>\n"
-        f"Максимальный выигрыш: <b>{s['max_win']:,} $</b>"
-    ).replace(",", " ")
+        f'<tg-emoji emoji-id="{PROFILE_TEXT_EMOJI_ID}">💵</tg-emoji> <b>Профиль › @{username}</b>\n\n'
+        f'<tg-emoji emoji-id="{PROFILE_ID_EMOJI_ID}">🆔</tg-emoji> ID: <b>#W-{app_id}</b> • <b>#TG-{tg_id}</b>\n\n'
+        f'<tg-emoji emoji-id="{PROFILE_SINCE_EMOJI_ID}">📅</tg-emoji> С нами: <b>{_days_with_us(p.get("created_at"))} дней</b> (с {_fmt_date(p.get("created_at"))})\n\n'
+        f'<tg-emoji emoji-id="{PROFILE_WINRATE_EMOJI_ID}">📈</tg-emoji> WinRate: <b>{s["winrate"]}%/{s["wins"]}/{s["losses"]}</b> (%win, №выигрышей, №проигрышей)\n'
+        f'<tg-emoji emoji-id="{PROFILE_PROFIT_EMOJI_ID}">💰</tg-emoji> Доходность: <b>{_fmt_money(financial["profit"])}/{_fmt_money(financial["deposits"])}/{_fmt_money(financial["withdrawals"])}</b> (профит, ≡депозит, ≡вывод)'
+    )
 
 
 def _wallet_text(uid: int) -> str:
-    b=get_balance(uid); s=get_user_stats(uid)
+    p = get_user_profile(uid) or {}
+    username = p.get("username") or "—"
+    b = get_balance(uid)
+    f = get_financial_stats(uid)
     return (
-        "<b>Кошелёк</b>\n\n"
-        f"Баланс\n<b>{b:,.2f} $</b>\n\n"
-        f"Оборот\n<b>{s['turnover']:,} $</b>\n\n"
-        "Выберите действие ниже."
-    ).replace(",", " ")
+        f'<tg-emoji emoji-id="{WALLET_TEXT_EMOJI_ID}">🧳</tg-emoji> <b>Кошелёк › @{username}</b>\n\n'
+        f'<tg-emoji emoji-id="{WALLET_BALANCE_EMOJI_ID}">💵</tg-emoji> Баланс: <b>{_fmt_money(b)}</b> • <b>{_fmt_money(b)}</b>\n\n'
+        f'<tg-emoji emoji-id="{WALLET_TURNOVER_BETS_EMOJI_ID}">📊</tg-emoji> <b>Оборот ставок (24ч): { _fmt_money(f["bets_24h"]) }</b>\n'
+        f'<tg-emoji emoji-id="{WALLET_TURNOVER_DEPOSITS_EMOJI_ID}">💳</tg-emoji> <b>Оборот депозитов (24ч): { _fmt_money(f["deposits_24h"]) }</b>'
+    )
+
 
 def _games_text() -> str:
     return (

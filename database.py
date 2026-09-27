@@ -451,6 +451,58 @@ def get_ledger_activity(limit: int = 200):
         return [dict(r) for r in c.execute("SELECT id,user_id,balance_usd AS amount,'legacy' AS reason,created_at FROM users ORDER BY id DESC LIMIT ?", (int(limit),)).fetchall()]
 
 
+def get_financial_stats(user_id: int) -> dict:
+    """Return 24h turnover and all-time deposit/withdrawal/profit figures."""
+    ensure_user(user_id)
+    if _is_pg():
+        with _LOCK, _pg_conn() as c:
+            uid = _pg_user_id(c, user_id)
+            row = c.execute(
+                '''
+                SELECT
+                    COALESCE((SELECT SUM(stake) FROM bot_games
+                              WHERE user_id=%s AND created_at >= NOW() - INTERVAL '24 hours'), 0) AS bets_24h,
+                    COALESCE((SELECT SUM(amount_usd) FROM bot_payments
+                              WHERE user_id=%s AND status='paid'
+                                AND COALESCE(paid_at, created_at) >= NOW() - INTERVAL '24 hours'), 0) AS deposits_24h,
+                    COALESCE((SELECT SUM(amount_usd) FROM bot_payments
+                              WHERE user_id=%s AND status='paid'), 0) AS deposits,
+                    COALESCE((SELECT SUM(amount_usd) FROM bot_withdrawals
+                              WHERE user_id=%s AND status IN ('pending','processing','paid','completed')), 0) AS withdrawals,
+                    COALESCE((SELECT SUM(payout) - SUM(stake) FROM bot_games
+                              WHERE user_id=%s), 0) AS profit
+                ''',
+                (uid, uid, uid, uid, uid),
+            ).fetchone()
+            return {k: round(float(row[k] or 0), 2) for k in (
+                "bets_24h", "deposits_24h", "deposits", "withdrawals", "profit"
+            )}
+
+    with _LOCK, _sqlite_conn() as c:
+        row = c.execute(
+            '''
+            SELECT
+                COALESCE((SELECT SUM(stake) FROM games
+                          WHERE user_id=? AND created_at >= ?), 0) AS bets_24h,
+                COALESCE((SELECT SUM(amount_usd) FROM payments
+                          WHERE user_id=? AND status='paid'
+                            AND COALESCE(paid_at, created_at) >= ?), 0) AS deposits_24h,
+                COALESCE((SELECT SUM(amount_usd) FROM payments
+                          WHERE user_id=? AND status='paid'), 0) AS deposits,
+                COALESCE((SELECT SUM(amount_usd) FROM withdrawals
+                          WHERE user_id=? AND status IN ('pending','processing','paid','completed')), 0) AS withdrawals,
+                COALESCE((SELECT SUM(payout) - SUM(stake) FROM games
+                          WHERE user_id=?), 0) AS profit
+            ''',
+            (int(user_id), int(time.time()) - 86400,
+             int(user_id), int(time.time()) - 86400,
+             int(user_id), int(user_id), int(user_id)),
+        ).fetchone()
+        return {k: round(float(row[k] or 0), 2) for k in (
+            "bets_24h", "deposits_24h", "deposits", "withdrawals", "profit"
+        )}
+
+
 def get_user_profile(telegram_id:int):
     if _is_pg():
         with _LOCK,_pg_conn() as c:
