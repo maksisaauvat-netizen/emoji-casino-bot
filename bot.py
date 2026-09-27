@@ -137,6 +137,7 @@ HISTORY_BUTTON_EMOJI_ID = "5857306747076611982"
 SETTINGS_BUTTON_EMOJI_ID = "5341715473882955310"
 USERS_BUTTON_EMOJI_ID = "5303328645329209869"
 ADMIN_BUTTON_EMOJI_ID = "5462921117423384478"
+ORIGINALS_HEADER_EMOJI_ID = "5055840333242303386"
 HELP_USERNAME = os.getenv("HELP_USERNAME", "narotan7").lstrip("@")
 # Premium custom emoji used as the currency/amount marker in bot messages.
 M = "₽"
@@ -913,7 +914,6 @@ def _games_keyboard():
         [InlineKeyboardButton(text="Mines", callback_data="refgame:mines", style=primary, icon_custom_emoji_id=MINES_BUTTON_EMOJI_ID), InlineKeyboardButton(text="🗼 Tower", callback_data="refgame:tower", style=primary), InlineKeyboardButton(text="✊ КНБ", callback_data="refgame:knb", style=primary)],
         [InlineKeyboardButton(text="🔢 Кено", callback_data="refgame:keno", style=primary), InlineKeyboardButton(text="🔻 Plinko", callback_data="refgame:plinko", style=primary), InlineKeyboardButton(text="Even", callback_data="refgame:even", style=primary, icon_custom_emoji_id=EVEN_BUTTON_EMOJI_ID)],
         [InlineKeyboardButton(text="Сектор", callback_data="refgame:sector", style=primary, icon_custom_emoji_id=SECTOR_BUTTON_EMOJI_ID), InlineKeyboardButton(text="Дуэль", callback_data="refgame:duel", style=primary, icon_custom_emoji_id=DUEL_BUTTON_EMOJI_ID)],
-        [InlineKeyboardButton(text="↕️ Больше-Меньше", callback_data="refgame:higher_lower", style=primary)],
         [InlineKeyboardButton(text="Hi-lo", callback_data="refgame:hilo", style=primary, icon_custom_emoji_id=HILO_BUTTON_EMOJI_ID), InlineKeyboardButton(text="🥅 Пенальти", callback_data="refgame:penalty", style=primary)],
         [InlineKeyboardButton(text="Play and Win", callback_data="play:home", style=primary, icon_custom_emoji_id=PLAY_AND_WIN_BUTTON_EMOJI_ID)],
     ])
@@ -961,21 +961,21 @@ def _wallet_text(uid: int) -> str:
 
 def _games_text() -> str:
     return (
-        "🤑 <b>Resonant Original's</b>\n\n"
-        "🎮 Авторские мини-игры против заведения\n"
-        "💣 Mines — открывайте клетки, забирайте до взрыва.\n"
+        f"<b><tg-emoji emoji-id=\"{ORIGINALS_HEADER_EMOJI_ID}\">🤑</tg-emoji> Resonant Original's</b>\n\n"
+        "<b>Доступные игры в боте:</b>\n\n"
+        "<blockquote>"
+        f"<tg-emoji emoji-id=\"{MINES_BUTTON_EMOJI_ID}\">💣</tg-emoji> Mines — открывайте клетки, забирайте до взрыва.\n"
         "🗼 Tower — поднимайтесь по башне, не наступите на бомбу.\n"
         "✊ КНБ — камень, ножницы, бумага: бросок против бота.\n"
         "🔢 Кено — отметьте 4 числа из 20, тираж вытянет 6.\n"
-        "🃏 Blackjack — наберите ближе к 21, чем дилер.\n"
-        "🎴 Baccara — Игрок, Банкир или Ничья: ближе к 9 — сильнее. При ничьей ставка на Игрока или Банкира возвращается.\n"
-        "🎲 Игра с Telegram Emojis — бросает бот.\n"
         "🔻 Plinko — больше выпавшее значение — больше коэффициент.\n"
-        "⚖️ Even — чётное или нечётное выпавшее значение.\n"
-        "🎡 Сектор — три сектора по два числа на выпавшем значении.\n"
-        "⚔️ Дуэль — ваш кубик против кубика бота.\n"
-        "🥅 Пенальти — бейте по воротам, забирайте до промаха.\n\n"
-        "Выберите игру:")
+        f"<tg-emoji emoji-id=\"{EVEN_BUTTON_EMOJI_ID}\">⚖️</tg-emoji> Even — чётное или нечётное выпавшее значение.\n"
+        f"<tg-emoji emoji-id=\"{SECTOR_BUTTON_EMOJI_ID}\">🎡</tg-emoji> Сектор — три сектора по два числа на выпавшем значении.\n"
+        f"<tg-emoji emoji-id=\"{DUEL_BUTTON_EMOJI_ID}\">⚔️</tg-emoji> Дуэль — ваш кубик против кубика бота.\n"
+        f"<tg-emoji emoji-id=\"{HILO_BUTTON_EMOJI_ID}\">🃏</tg-emoji> Hi-lo\n"
+        "🥅 Пенальти — бейте по воротам, забирайте до промаха."
+        "</blockquote>\n\n"
+        "<b>Выберите игру:</b>")
 
 def _play_and_win_text() -> str:
     return "🤑 <b>Resonant Original's</b>\n\n🎮 Авторские мини-игры против заведения\n\nВыберите, где хотите играть:"
