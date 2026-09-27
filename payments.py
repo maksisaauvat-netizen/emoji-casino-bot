@@ -30,6 +30,8 @@ async def create_invoice(user_id: int, amount_usdt: float) -> dict:
     if amount_usdt < MIN_DEPOSIT_USD:
         raise ValueError("Minimum deposit is $0.10")
     if not CRYPTOBOT_TOKEN:
+        if os.getenv("REAL_ECONOMY", "true").lower() == "true":
+            raise RuntimeError("CRYPTOBOT_TOKEN is required when REAL_ECONOMY=true")
         invoice_id = abs(hash((int(user_id), amount_usdt))) % 2_000_000_000
         return {"invoice_id": invoice_id, "status": "demo", "amount": str(amount_usdt), "asset": CRYPTOBOT_ASSET, "pay_url": ""}
     result = await _api("createInvoice", {
@@ -50,12 +52,23 @@ async def create_invoice(user_id: int, amount_usdt: float) -> dict:
     return invoice
 
 
+async def get_transfers(spend_id: str) -> list[dict]:
+    if not CRYPTOBOT_TOKEN:
+        return []
+    result = await _api("getTransfers", {"spend_id": str(spend_id), "count": 10})
+    return result if isinstance(result, list) else []
+
+
 async def get_invoice(invoice_id: int) -> Optional[dict]:
     if not CRYPTOBOT_TOKEN:
         return {"invoice_id": int(invoice_id), "status": "demo"}
     result = await _api("getInvoices", {"invoice_ids": str(int(invoice_id))})
-    items = result.get("items", []) if isinstance(result, dict) else []
-    return items[0] if items else None
+    if isinstance(result, list):
+        return result[0] if result else None
+    if isinstance(result, dict):
+        items = result.get("items", [])
+        return items[0] if items else None
+    return None
 
 
 async def process_paid_invoice(invoice_id: int):

@@ -40,9 +40,11 @@ _record_game_db = record_game
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 BASE_URL = os.getenv("BASE_URL", "https://example.com").rstrip("/")
 WEBAPP_URL = os.getenv("WEBAPP_URL", BASE_URL)
-WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", secrets.token_urlsafe(24))
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
+if not WEBHOOK_SECRET:
+    raise RuntimeError("WEBHOOK_SECRET must be set in production")
 WEBAPP_AUTH_MAX_AGE = int(os.getenv("WEBAPP_AUTH_MAX_AGE", "86400"))
-REAL_ECONOMY = os.getenv("REAL_ECONOMY", "false").lower() == "true"
+REAL_ECONOMY = os.getenv("REAL_ECONOMY", "true").lower() == "true"
 HOUSE_EDGE = float(os.getenv("HOUSE_EDGE", "0.075"))
 GAME_CHAT_ID = os.getenv("GAME_CHAT_ID", "").strip()
 CRYPTOBOT_AUTO_PAYOUT = os.getenv("CRYPTOBOT_AUTO_PAYOUT", "true").lower() == "true"
@@ -305,7 +307,9 @@ def validate_telegram_webapp_data(init_data: str) -> dict:
         expected = hmac.new(secret, check_string.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(expected, received_hash):
             raise ValueError("bad hash")
-        if time.time() - int(pairs.get("auth_date", "0")) > WEBAPP_AUTH_MAX_AGE:
+        auth_date = int(pairs.get("auth_date", "0"))
+        now = int(time.time())
+        if not auth_date or auth_date > now + 60 or now - auth_date > WEBAPP_AUTH_MAX_AGE:
             raise ValueError("expired initData")
         user = json.loads(pairs.get("user", "{}"))
         if not user.get("id"):
@@ -322,7 +326,6 @@ class Auth(BaseModel):
 class StartGame(Auth):
     game: str
     stake_usd: Optional[float] = Field(default=None, gt=0, le=1_000_000)
-    stake_rub: Optional[float] = Field(default=None, gt=0, le=1_000_000)
     option: Optional[str] = None
     mines_count: Optional[int] = Field(default=None, ge=2, le=24)
     upgrade_percent: Optional[float] = Field(default=None, ge=1, le=80)
@@ -610,7 +613,7 @@ async def admin_adjust(payload: dict):
 @app.post("/api/game/start")
 async def start(p: StartGame):
     u=validate_telegram_webapp_data(p.init_data); uid=int(u["id"]); ensure_user(uid)
-    game=p.game.lower().strip(); stake=float(p.stake_usd if p.stake_usd is not None else (p.stake_rub or 0))
+    game=p.game.lower().strip(); stake=float(p.stake_usd or 0)
     if game not in GAME_NAMES: raise HTTPException(400,"Unknown game")
     if not MIN_BET_USD <= stake <= MAX_BET_USD: raise HTTPException(400, f"Ставка от ${MIN_BET_USD:.2f} до ${MAX_BET_USD:.2f}")
     if uid in active_games: raise HTTPException(409,"Сначала завершите текущую игру")
@@ -1352,7 +1355,12 @@ def _public_player_name(uid: int) -> str:
     try:
         p = get_user_profile(uid) or {}
         username = p.get("username")
-        return f"@{username}" if username else f"Игрок #{uid}"
+        if username:
+            return f"@{username}"
+        # Never expose the internal database/Telegram identifier in the public log.
+        import hashlib
+        alias = int(hashlib.sha256(f"resonant:{uid}".encode()).hexdigest()[:8], 16) % 100000
+        return f"Игрок #{alias:05d}"
     except Exception:
         return f"Игрок #{uid}"
 
