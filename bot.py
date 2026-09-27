@@ -117,9 +117,12 @@ WALLET_IMAGE = Path(os.getenv("WALLET_IMAGE", str(ROOT_DIR / "wallet.jpg")))
 PROFILE_IMAGE = Path(os.getenv("PROFILE_IMAGE", str(ROOT_DIR / "profile.jpg")))
 
 # Telegram Premium custom emoji used as native button icons.
-PLAY_AND_WIN_BUTTON_EMOJI_ID = "5438615665567084768"
+PLAY_AND_WIN_BUTTON_EMOJI_ID = "5384105916331202592"
 WALLET_BUTTON_EMOJI_ID = "4965219701572503640"
 PROFILE_BUTTON_EMOJI_ID = "5019726470101075726"
+BONUSES_BUTTON_EMOJI_ID = "5215203359593617488"
+PLAY_BUTTON_EMOJI_ID = "5438615665567084768"
+HELP_BUTTON_EMOJI_ID = "5395695537687123235"
 MINES_BUTTON_EMOJI_ID = "5280569974404966639"
 EVEN_BUTTON_EMOJI_ID = "5400250414929041085"
 SECTOR_BUTTON_EMOJI_ID = "5226711870492126219"
@@ -858,9 +861,9 @@ def _menu_keyboard(user_id: int):
     rows = [
         [InlineKeyboardButton(text="Профиль", callback_data="menu:profile", icon_custom_emoji_id=PROFILE_BUTTON_EMOJI_ID)],
         [InlineKeyboardButton(text="Кошелек", callback_data="menu:wallet", icon_custom_emoji_id=WALLET_BUTTON_EMOJI_ID),
-         InlineKeyboardButton(text="🎁 Бонусы", callback_data="menu:bonuses")],
-        [InlineKeyboardButton(text="🎮 Играть", callback_data="menu:games")],
-        [InlineKeyboardButton(text="🆘 Помощь", url=f"https://t.me/{HELP_USERNAME}")],
+         InlineKeyboardButton(text="Бонусы", callback_data="menu:bonuses", icon_custom_emoji_id=BONUSES_BUTTON_EMOJI_ID)],
+        [InlineKeyboardButton(text="Играть", callback_data="menu:games", icon_custom_emoji_id=PLAY_BUTTON_EMOJI_ID)],
+        [InlineKeyboardButton(text="Помощь", url=f"https://t.me/{HELP_USERNAME}", icon_custom_emoji_id=HELP_BUTTON_EMOJI_ID)],
     ]
     if is_admin(user_id):
         rows.insert(-1, [InlineKeyboardButton(text="Admin panel", callback_data="admin:home", icon_custom_emoji_id=ADMIN_BUTTON_EMOJI_ID)])
@@ -897,7 +900,7 @@ def _wallet_keyboard():
         [InlineKeyboardButton(text="Пополнить", callback_data="wallet:deposit", icon_custom_emoji_id=DEPOSIT_BUTTON_EMOJI_ID),
          InlineKeyboardButton(text="Вывод", callback_data="wallet:withdraw", icon_custom_emoji_id=WITHDRAW_BUTTON_EMOJI_ID)],
         [InlineKeyboardButton(text="История", callback_data="wallet:history", icon_custom_emoji_id=HISTORY_BUTTON_EMOJI_ID)],
-        [InlineKeyboardButton(text="🎮 Играть", callback_data="menu:games"),
+        [InlineKeyboardButton(text="Играть", callback_data="menu:games", icon_custom_emoji_id=PLAY_BUTTON_EMOJI_ID),
          InlineKeyboardButton(text="Назад", callback_data="menu:home", icon_custom_emoji_id=BACK_BUTTON_EMOJI_ID)],
     ])
 
@@ -1292,7 +1295,7 @@ async def _show_ref_options(message: Message, uid: int, game: str, stake: int):
     if game == "tower":
         kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🟢 2 уровня", callback_data="refopt:tower:2"), InlineKeyboardButton(text="🟡 3 уровня", callback_data="refopt:tower:3")], [InlineKeyboardButton(text="🔴 4 уровня", callback_data="refopt:tower:4")]])
     elif game == "knb":
-        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🪨 Камень", callback_data="refopt:knb:rock"), InlineKeyboardButton(text="📄 Бумага", callback_data="refopt:paper")], [InlineKeyboardButton(text="✂️ Ножницы", callback_data="refopt:knb:scissors")]])
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🪨 Камень", callback_data="refopt:knb:rock"), InlineKeyboardButton(text="📄 Бумага", callback_data="refopt:knb:paper")], [InlineKeyboardButton(text="✂️ Ножницы", callback_data="refopt:knb:scissors")]])
     elif game == "keno":
         kb = None
     elif game == "blackjack":
@@ -1326,7 +1329,11 @@ async def _show_ref_options(message: Message, uid: int, game: str, stake: int):
 async def reference_game_option(callback: CallbackQuery):
     uid = callback.from_user.id
     sync_profile(uid, callback.from_user.username)
-    _, game, option = callback.data.split(":", 2)
+    parts = callback.data.split(":", 2)
+    if len(parts) != 3:
+        await callback.answer("Некорректная кнопка игры. Откройте игру заново.", show_alert=True)
+        return
+    _, game, option = parts
     s = bot_sessions.get(uid, {})
     if s.get("game") != game or "stake" not in s:
         await callback.answer("Сессия не найдена", show_alert=True); return
