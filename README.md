@@ -109,3 +109,18 @@ The Mini App serves images directly from the project root. No `assets/` director
 
 ### Premium custom emoji
 The bot uses Telegram custom emoji entities for the supplied IDs. The Mini App displays the same IDs through the `/custom-emoji/{id}` proxy; no `assets/` folder is required. Inline keyboard button labels keep ordinary Unicode emoji because Telegram does not support message entities inside button text.
+
+## USD wallet + public game log
+
+- The common wallet currency is **USD ($)** and the bot uses the same PostgreSQL `LedgerEntry` balance as the Mini App.
+- CryptoBot / Crypto Pay is used for deposits in USDT at a 1:1 internal USD rate.
+- Minimum deposit: **$0.10**.
+- Minimum withdrawal: **$1.00**.
+- With `CRYPTOBOT_AUTO_PAYOUT=true`, withdrawals are sent to the user's CryptoBot account via Crypto Pay transfer; failed payouts are refunded to the shared ledger.
+- The public game-history chat is configured with `GAME_CHAT_ID` or by an admin running `/setlogchat` inside the target group.
+- The bot displays the total number of users from the shared `User` table.
+- Reference-game coefficients use a default **7.5% house edge** where the underlying probability is known; `HOUSE_EDGE` can be adjusted for the probability-based modes.
+
+### CryptoBot setup
+
+Create a Crypto Pay API token through `@CryptoBot`, put it into `CRYPTOBOT_TOKEN`, and make sure the bot account can use the configured Crypto Pay balance for transfers. Crypto Pay supports invoice-based crypto payments and transfers to users. See the official CryptoBot documentation for current API/limits. 

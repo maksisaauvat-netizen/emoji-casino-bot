@@ -7,7 +7,9 @@ from database import create_payment, mark_payment_paid, log_event
 
 CRYPTOBOT_TOKEN = os.getenv("CRYPTOBOT_TOKEN", "").strip()
 CRYPTOBOT_API = os.getenv("CRYPTOBOT_API", "https://pay.crypt.bot/api")
-USDT_TO_RUB = float(os.getenv("USDT_TO_RUB", "80"))
+CRYPTOBOT_ASSET = os.getenv("CRYPTOBOT_ASSET", "USDT").strip().upper()
+MIN_DEPOSIT_USD = float(os.getenv("MIN_DEPOSIT_USD", "0.10"))
+MIN_WITHDRAW_USD = float(os.getenv("MIN_WITHDRAW_USD", "1.00"))
 
 
 async def _api(method: str, payload: dict | None = None) -> dict:
@@ -25,22 +27,26 @@ async def _api(method: str, payload: dict | None = None) -> dict:
 
 async def create_invoice(user_id: int, amount_usdt: float) -> dict:
     amount_usdt = round(float(amount_usdt), 2)
-    if amount_usdt <= 0:
-        raise ValueError("amount_usdt must be positive")
+    if amount_usdt < MIN_DEPOSIT_USD:
+        raise ValueError("Minimum deposit is $0.10")
     if not CRYPTOBOT_TOKEN:
-        # Development mode: never credits balance automatically; gives a clear placeholder.
         invoice_id = abs(hash((int(user_id), amount_usdt))) % 2_000_000_000
-        return {"invoice_id": invoice_id, "status": "demo", "amount": str(amount_usdt), "asset": "USDT", "pay_url": ""}
-    result = await _api("createInvoice", {"currency_type": "crypto", "asset": "USDT", "amount": str(amount_usdt), "description": f"Resonant deposit for {user_id}"})
+        return {"invoice_id": invoice_id, "status": "demo", "amount": str(amount_usdt), "asset": CRYPTOBOT_ASSET, "pay_url": ""}
+    result = await _api("createInvoice", {
+        "currency_type": "crypto",
+        "asset": CRYPTOBOT_ASSET,
+        "amount": f"{amount_usdt:.2f}",
+        "description": f"Resonant deposit for {user_id}",
+    })
     invoice = {
         "invoice_id": int(result["invoice_id"]),
         "status": result.get("status", "active"),
         "amount": result.get("amount", str(amount_usdt)),
-        "asset": result.get("asset", "USDT"),
+        "asset": result.get("asset", CRYPTOBOT_ASSET),
         "pay_url": result.get("pay_url") or result.get("bot_invoice_url") or result.get("mini_app_invoice_url"),
     }
-    create_payment(user_id, invoice["invoice_id"], amount_usdt, int(round(amount_usdt * USDT_TO_RUB)), invoice["status"])
-    log_event(user_id, "deposit_invoice_created", f"invoice={invoice['invoice_id']} amount_usdt={amount_usdt}")
+    create_payment(user_id, invoice["invoice_id"], amount_usdt, amount_usdt, invoice["status"])
+    log_event(user_id, "deposit_invoice_created", f"invoice={invoice['invoice_id']} amount_usd={amount_usdt}")
     return invoice
 
 
@@ -54,10 +60,22 @@ async def get_invoice(invoice_id: int) -> Optional[dict]:
 
 async def process_paid_invoice(invoice_id: int):
     invoice = await get_invoice(invoice_id)
-    if not invoice:
-        return None
-    if invoice.get("status") != "paid":
+    if not invoice or invoice.get("status") != "paid":
         return None
     result = mark_payment_paid(int(invoice_id))
-    if result: log_event(int(result['user_id']), "deposit_paid", f"invoice={invoice_id} amount_rub={result['amount_rub']}")
+    if result:
+        log_event(int(result["user_id"]), "deposit_paid", f"invoice={invoice_id} amount_usd={result['amount_usd']}")
     return result
+
+
+async def create_withdrawal_payout(user_id: int, amount_usd: float, spend_id: str, comment: str = "Resonant withdrawal") -> dict:
+    amount_usd = round(float(amount_usd), 2)
+    if amount_usd < MIN_WITHDRAW_USD:
+        raise ValueError("Minimum withdrawal is $1.00")
+    return await _api("transfer", {
+        "user_id": int(user_id),
+        "asset": CRYPTOBOT_ASSET,
+        "amount": f"{amount_usd:.2f}",
+        "spend_id": str(spend_id),
+        "comment": comment[:255],
+    })
