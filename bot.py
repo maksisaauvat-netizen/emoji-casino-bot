@@ -863,7 +863,7 @@ def _menu_keyboard(user_id: int):
         [InlineKeyboardButton(text="🆘 Помощь", url=f"https://t.me/{HELP_USERNAME}")],
     ]
     if is_admin(user_id):
-        rows.insert(-1, [InlineKeyboardButton(text="Админ панель", callback_data="admin:home", icon_custom_emoji_id=ADMIN_BUTTON_EMOJI_ID)])
+        rows.insert(-1, [InlineKeyboardButton(text="Admin panel", callback_data="admin:home", icon_custom_emoji_id=ADMIN_BUTTON_EMOJI_ID)])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 def _bottom_keyboard(user_id: int):
@@ -875,7 +875,7 @@ def _bottom_keyboard(user_id: int):
         ],
     ]
     if is_admin(user_id):
-        rows.append([KeyboardButton(text="Админ панель", icon_custom_emoji_id=ADMIN_BUTTON_EMOJI_ID, style="primary")])
+        rows.append([KeyboardButton(text="Admin panel", icon_custom_emoji_id=ADMIN_BUTTON_EMOJI_ID, style="primary")])
     return ReplyKeyboardMarkup(
         keyboard=rows,
         resize_keyboard=True,
@@ -1528,12 +1528,18 @@ async def admin_command(message: Message):
     if not message.from_user or not is_admin(message.from_user.id):
         await message.answer("Доступ запрещен.")
         return
-    await message.answer("🛠 <b>ADMIN PANEL</b>\n\nВыберите раздел:", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Пользователи",icon_custom_emoji_id=USERS_BUTTON_EMOJI_ID,callback_data="admin:users"), InlineKeyboardButton(text="📊 Активность",callback_data="admin:activity")],
-        [InlineKeyboardButton(text="Изменить баланс",icon_custom_emoji_id=DEPOSIT_BUTTON_EMOJI_ID,callback_data="admin:adjust")],
-        [InlineKeyboardButton(text="📝 Логи",callback_data="admin:logs")],
-        [InlineKeyboardButton(text="💳 Пополнения",callback_data="admin:payments"), InlineKeyboardButton(text="💸 Выводы",callback_data="admin:withdrawals")],
-    ]))
+    await message.answer(
+        f"🛠 <b>ADMIN PANEL</b>\n\nTelegram ID: <code>{message.from_user.id}</code>\n\nВыберите раздел:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Пользователи",icon_custom_emoji_id=USERS_BUTTON_EMOJI_ID,callback_data="admin:users"), InlineKeyboardButton(text="📊 Активность",callback_data="admin:activity")],
+            [InlineKeyboardButton(text="Изменить баланс",icon_custom_emoji_id=DEPOSIT_BUTTON_EMOJI_ID,callback_data="admin:adjust")],
+            [InlineKeyboardButton(text="📝 Логи",callback_data="admin:logs")],
+            [InlineKeyboardButton(text="💳 Пополнения",callback_data="admin:payments"), InlineKeyboardButton(text="💸 Выводы",callback_data="admin:withdrawals")],
+        ]),
+    )
+    # Refresh the persistent bottom keyboard so the admin button appears immediately
+    # after a newly authorized admin deploys or changes ADMIN_TELEGRAM_IDS.
+    await message.answer("Меню обновлено.", reply_markup=_bottom_keyboard(message.from_user.id))
 
 async def _send_section_photo(message: Message, image_path: Path, caption: str, reply_markup):
     """Send a section hero image with its normal section controls."""
@@ -1562,16 +1568,20 @@ async def upgrade_message_router(message: Message):
     if text in {"Профиль", "💵 Профиль"}:
         await _send_section_photo(message, PROFILE_IMAGE, _profile_text(uid), _profile_keyboard(uid))
         return
-    if text in {"⚙️ Админ панель", "Админ панель", "ADMIN PANEL"}:
+    if text in {"⚙️ Админ панель", "Админ панель", "Admin panel", "ADMIN PANEL"}:
         if not is_admin(uid):
             await message.answer("Доступ запрещен.")
             return
-        await message.answer("🛠 <b>ADMIN PANEL</b>\n\nВыберите раздел:", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Пользователи",icon_custom_emoji_id=USERS_BUTTON_EMOJI_ID,callback_data="admin:users"), InlineKeyboardButton(text="📊 Активность",callback_data="admin:activity")],
-            [InlineKeyboardButton(text="Изменить баланс",icon_custom_emoji_id=DEPOSIT_BUTTON_EMOJI_ID,callback_data="admin:adjust")],
-            [InlineKeyboardButton(text="📝 Логи",callback_data="admin:logs")],
-            [InlineKeyboardButton(text="💳 Пополнения",callback_data="admin:payments"), InlineKeyboardButton(text="💸 Выводы",callback_data="admin:withdrawals")],
-        ]))
+        await message.answer(
+            f"🛠 <b>ADMIN PANEL</b>\n\nTelegram ID: <code>{uid}</code>\n\nВыберите раздел:",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Пользователи",icon_custom_emoji_id=USERS_BUTTON_EMOJI_ID,callback_data="admin:users"), InlineKeyboardButton(text="📊 Активность",callback_data="admin:activity")],
+                [InlineKeyboardButton(text="Изменить баланс",icon_custom_emoji_id=DEPOSIT_BUTTON_EMOJI_ID,callback_data="admin:adjust")],
+                [InlineKeyboardButton(text="📝 Логи",callback_data="admin:logs")],
+                [InlineKeyboardButton(text="💳 Пополнения",callback_data="admin:payments"), InlineKeyboardButton(text="💸 Выводы",callback_data="admin:withdrawals")],
+            ]),
+        )
+        await message.answer("Меню обновлено.", reply_markup=_bottom_keyboard(uid))
         return
     if session:
         if session.get("step")=="deposit_amount":
